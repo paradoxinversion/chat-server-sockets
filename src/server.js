@@ -8,8 +8,20 @@ app.use(cors());
 
 let chatClients = [];
 
+const createUser = clientId => {
+  return {
+    username: `Anon-${clientId}`,
+    avatar: `https://i.pravatar.cc/150?u=${clientId}`,
+    id: clientId
+  };
+};
+
+/**
+ * Adds a chat client to the `chatClients` array if one doesn't
+ * already exist.
+ * @param {*} client - A socket client
+ */
 const addChatClient = client => {
-  const newClientUsername = `Anon-${client.id}`;
   let clientExists = false;
   for (let x = 0; x < chatClients.length; x++) {
     const chatClient = chatClients[x];
@@ -18,11 +30,7 @@ const addChatClient = client => {
 
   // If none exists yet, add it
   if (!clientExists) {
-    client.user = {
-      username: newClientUsername,
-      avatar: `https://i.pravatar.cc/150?u=${newClientUsername}`,
-      id: client.id
-    };
+    client.user = createUser(client.id);
     chatClients.push(client);
     console.log(`New chat user entered: ${client.user.username}`);
   }
@@ -34,9 +42,6 @@ const removeChatClient = clientId => {
   return chatClients;
 };
 
-const getChatClient = clientId => {
-  return chatClients.find(client => client.id === clientId);
-};
 /**
  * Return an array of chat users (from the clients array)
  */
@@ -55,7 +60,6 @@ io.on("connection", function(socket) {
   });
 
   socket.on("chat-message-sent", function(data) {
-    console.log(data);
     const message = {
       id: socket.id,
       user: socket.client.user,
@@ -64,24 +68,27 @@ io.on("connection", function(socket) {
       from: data.from || "",
       to: data.to || ""
     };
+
     if (data.to) {
-      // io.to(room).emit("pm", message);
       socket.to(data.to).emit("pm", message);
       socket.emit("pm", message);
     } else {
       io.emit("chat-message-broadcast", message);
     }
   });
+
   socket.on("private-chat-initiated", function(userId) {
     const [p1, p2] = [socket.id, userId].sort((a, b) => a - b);
-    // join this user to a room with the selected user
     const roomName = `${p1}-${p2}`;
+
     Promise.all([
       socket.join(roomName),
       io.sockets.sockets[userId].join(roomName)
     ]);
+
     io.to(roomName).emit("private-chat-initiated", roomName);
   });
+
   socket.on("set-username", function(username) {
     socket.client.user = username;
   });
