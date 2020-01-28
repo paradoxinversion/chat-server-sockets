@@ -18,13 +18,18 @@ module.exports = (() => {
   const makeConfig = () => {
     if (getEnv() === "development") {
       require("dotenv").config();
+    } else if (getEnv() === "production") {
+      require("dotenv").config({
+        path: path.resolve(process.cwd(), ".env.production")
+      });
     }
 
     config = {
       server: {
         port: process.env.SERVER_PORT,
         cookieName: process.env.COOKIE_NAME,
-        allowedOrigins: process.env.ALLOWED_ORIGINS
+        allowedOrigins: process.env.ALLOWED_ORIGINS,
+        socketPath: process.env.SOCKETIO_PATH
       }
     };
     return config;

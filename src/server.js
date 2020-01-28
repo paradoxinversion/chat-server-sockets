@@ -2,12 +2,13 @@ const config = require("./config/config").getConfig();
 console.log(config);
 const app = require("express")();
 const http = require("http").createServer(app);
+
 const io = require("socket.io")(http, {
-  cookie: config.server.cookieName
+  cookie: config.server.cookieName,
+  path: config.server.socketPath
 });
 const whitelist = config.server.allowedOrigins.split(",");
 io.origins(whitelist);
-console.log(whitelist);
 const cors = require("cors");
 var corsOptions = {
   origin: function(origin, callback) {
