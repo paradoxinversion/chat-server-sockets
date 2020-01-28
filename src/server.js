@@ -7,6 +7,7 @@ const io = require("socket.io")(http, {
 });
 const whitelist = config.server.allowedOrigins.split(",");
 io.origins(whitelist);
+console.log(whitelist);
 const cors = require("cors");
 var corsOptions = {
   origin: function(origin, callback) {
