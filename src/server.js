@@ -7,17 +7,8 @@ const io = require("socket.io")(http, {
 });
 
 const whitelist = config.server.allowedOrigins.split(",");
-io.origins(whitelist);
+io.origins("*:*");
 const cors = require("cors");
-// var corsOptions = {
-//   origin: function(origin, callback) {
-//     if (whitelist.indexOf(origin) !== -1) {
-//       callback(null, true);
-//     } else {
-//       callback(new Error(`Not allowed by CORS: ${origin}`));
-//     }
-//   }
-// };
 app.use(cors());
 
 let chatClients = [];
