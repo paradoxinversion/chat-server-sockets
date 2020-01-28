@@ -1,8 +1,11 @@
-var app = require("express")();
-var http = require("http").createServer(app);
-var io = require("socket.io")(http, {
-  cookie: "chat-app"
+const config = require("./config/config").getConfig();
+console.log(config);
+const app = require("express")();
+const http = require("http").createServer(app);
+const io = require("socket.io")(http, {
+  cookie: config.server.cookieName
 });
+io.origins(config.server.allowedOrigins.split(","));
 const cors = require("cors");
 app.use(cors());
 
@@ -103,6 +106,6 @@ io.on("connection", function(socket) {
   });
 });
 
-http.listen(3001, function() {
-  console.log("listening on *:3000");
+http.listen(config.server.port, function() {
+  console.log(`Listening on port ${config.server.port}`);
 });
