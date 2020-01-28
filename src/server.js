@@ -5,9 +5,19 @@ const http = require("http").createServer(app);
 const io = require("socket.io")(http, {
   cookie: config.server.cookieName
 });
-io.origins(config.server.allowedOrigins.split(","));
+const whitelist = config.server.allowedOrigins.split(",");
+io.origins(whitelist);
 const cors = require("cors");
-app.use(cors());
+var corsOptions = {
+  origin: function(origin, callback) {
+    if (whitelist.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  }
+};
+app.use(cors(corsOptions));
 
 let chatClients = [];
 
