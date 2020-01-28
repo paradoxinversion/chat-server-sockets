@@ -1,25 +1,23 @@
 const config = require("./config/config").getConfig();
-console.log(config);
 const app = require("express")();
 const http = require("http").createServer(app);
-
 const io = require("socket.io")(http, {
   cookie: config.server.cookieName,
   path: config.server.socketPath
 });
+
 const whitelist = config.server.allowedOrigins.split(",");
-io.origins("*:*");
+io.origins(whitelist);
 const cors = require("cors");
-var corsOptions = {
-  origin: function(origin, callback) {
-    if (whitelist.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error(`Not allowed by CORS: ${origin}`));
-    }
-  }
-};
-// app.use(cors(corsOptions));
+// var corsOptions = {
+//   origin: function(origin, callback) {
+//     if (whitelist.indexOf(origin) !== -1) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error(`Not allowed by CORS: ${origin}`));
+//     }
+//   }
+// };
 app.use(cors());
 
 let chatClients = [];
