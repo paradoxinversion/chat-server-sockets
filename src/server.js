@@ -8,7 +8,7 @@ const io = require("socket.io")(http, {
   path: config.server.socketPath
 });
 const whitelist = config.server.allowedOrigins.split(",");
-io.origins(whitelist);
+io.origins("*:*");
 const cors = require("cors");
 var corsOptions = {
   origin: function(origin, callback) {
@@ -19,7 +19,8 @@ var corsOptions = {
     }
   }
 };
-app.use(cors(corsOptions));
+// app.use(cors(corsOptions));
+app.use(cors());
 
 let chatClients = [];
 
