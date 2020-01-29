@@ -6,7 +6,6 @@ const io = require("socket.io")(http, {
   path: config.server.socketPath
 });
 
-const whitelist = config.server.allowedOrigins.split(",");
 io.origins("*:*");
 const cors = require("cors");
 app.use(cors());
@@ -52,6 +51,12 @@ const removeChatClient = clientId => {
  */
 const getChatUsers = () => chatClients.map(client => client.user);
 
+const getUserByName = username => {
+  return chatClients.find(client => {
+    console.log(client.user.username, username);
+    return client.user.username === username;
+  });
+};
 io.on("connection", function(socket) {
   addChatClient(socket.client);
 
@@ -95,7 +100,19 @@ io.on("connection", function(socket) {
   });
 
   socket.on("set-username", function(username) {
-    socket.client.user = username;
+    const existingUser = getUserByName(username.username);
+    console.log(existingUser);
+    if (!existingUser) {
+      const oldName = socket.client.user.username;
+      socket.client.user.username = username.username;
+      // socket.emit("set-username", { username: socket.client.user.username });
+      io.emit("room-user-change", {
+        users: getChatUsers(),
+        message: `${oldName} is now ${socket.client.user.username}.`
+      });
+    } else {
+      socket.emit("set-username-error", "Username Taken");
+    }
   });
 
   socket.on("disconnect", function() {
