@@ -1,14 +1,51 @@
 const config = require("./config/config").getConfig();
 const app = require("express")();
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 const http = require("http").createServer(app);
+const setupdb = require("./mongo/setupdb");
+const passport = require("passport");
+const LocalStrategy = require("passport-local").Strategy;
+// const socketAuth = require('socketio-auth');
+
 const io = require("socket.io")(http, {
   cookie: config.server.cookieName,
   path: config.server.socketPath
 });
-
-io.origins("*:*");
+const userActions = require("./mongo/actions/User");
+const User = require("./mongo/models/User");
+// io.origins("*:*");
+io.origins("http://localhost:3000");
 const cors = require("cors");
-app.use(cors());
+
+const database = setupdb(false);
+passport.use(
+  new LocalStrategy(async function(username, password, done) {
+    const user = await User.findOne({ username: username });
+
+    if (!user) {
+      return done(null, false, { message: "Incorrect username." });
+    }
+    if (!user.checkPassword(password)) {
+      return done(null, false, { message: "Incorrect password." });
+    }
+    return done(null, user);
+  })
+);
+
+passport.serializeUser(function(user, done) {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async function(id, done) {
+  const user = User.findById(id);
+  done(null, user);
+});
+
+app.use(passport.initialize());
+app.use(cookieParser());
+app.use(require("express").json());
+app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 
 let chatClients = [];
 
@@ -57,6 +94,7 @@ const getUserByName = username => {
     return client.user.username === username;
   });
 };
+
 io.on("connection", function(socket) {
   addChatClient(socket.client);
 
@@ -101,7 +139,6 @@ io.on("connection", function(socket) {
 
   socket.on("set-username", function(username) {
     const existingUser = getUserByName(username.username);
-    console.log(existingUser);
     if (!existingUser) {
       const oldName = socket.client.user.username;
       socket.client.user.username = username.username;
@@ -123,6 +160,28 @@ io.on("connection", function(socket) {
       message: `${socket.client.user.username} has left the chat room.`
     });
   });
+});
+
+app.post("/sign-in", passport.authenticate("local"), (req, res) => {
+  const token = jwt.sign(
+    {
+      user: req.user.id
+    },
+    "dev"
+  );
+  res.json({ login: "success", token });
+});
+
+app.post("/sign-up", (req, res) => {
+  console.log(req.body);
+  const newUser = userActions.createUser(req.body);
+  const token = jwt.sign(
+    {
+      user: newUser.id
+    },
+    "dev"
+  );
+  res.json({ login: "success", token });
 });
 
 http.listen(config.server.port, function() {
