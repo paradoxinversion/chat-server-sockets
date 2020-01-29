@@ -16,7 +16,10 @@ const io = require("socket.io")(http, {
 const userActions = require("./mongo/actions/User");
 const User = require("./mongo/models/User");
 // io.origins("*:*");
-io.origins("http://localhost:3000");
+io.origins([
+  "http://localhost:3000",
+  "https://chat-app-client-experiment.now.sh"
+]);
 const cors = require("cors");
 
 const database = setupdb(false);
@@ -46,7 +49,17 @@ passport.deserializeUser(async function(id, done) {
 app.use(passport.initialize());
 app.use(cookieParser());
 app.use(require("express").json());
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+
+if (process.env.NODE_ENV === "production") {
+  app.use(
+    cors({
+      origin: "https://chat-app-client-experiment.now.sh",
+      credentials: true
+    })
+  );
+} else {
+  app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+}
 
 let chatClients = [];
 
