@@ -1,10 +1,16 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const Schema = mongoose.Schema;
-
+/***
+ * Roles:
+ * 0 - User
+ * 1 - Admin
+ */
 const UserSchema = new Schema({
   username: String,
-  password: String
+  password: String,
+  role: String,
+  blockedUsers: [String]
 });
 
 UserSchema.methods.checkPassword = async function(password) {

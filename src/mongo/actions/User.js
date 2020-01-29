@@ -13,7 +13,7 @@ const createUser = async ({ username, password }) => {
   // TODO: Make salt rounds a config option
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const newUser = new User({ username, password: hashedPassword });
+  const newUser = new User({ username, password: hashedPassword, role: 0 });
   newUser.save();
   return newUser;
 };

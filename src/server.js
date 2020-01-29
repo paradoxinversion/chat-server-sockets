@@ -2,6 +2,7 @@ const config = require("./config/config").getConfig();
 const app = require("express")();
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
+const cookie = require("cookie");
 const http = require("http").createServer(app);
 const setupdb = require("./mongo/setupdb");
 const passport = require("passport");
@@ -57,12 +58,20 @@ const createUser = clientId => {
   };
 };
 
+const cUser = (clientId, user) => {
+  return {
+    username: user.username,
+    avatar: `https://i.pravatar.cc/150?u=${clientId}`,
+    id: clientId
+  };
+};
+
 /**
  * Adds a chat client to the `chatClients` array if one doesn't
  * already exist.
  * @param {*} client - A socket client
  */
-const addChatClient = client => {
+const addChatClient = (client, user) => {
   let clientExists = false;
   for (let x = 0; x < chatClients.length; x++) {
     const chatClient = chatClients[x];
@@ -71,7 +80,8 @@ const addChatClient = client => {
 
   // If none exists yet, add it
   if (!clientExists) {
-    client.user = createUser(client.id);
+    // client.user = createUser(client.id);
+    client.user = cUser(client.id, user);
     chatClients.push(client);
     console.log(`New chat user entered: ${client.user.username}`);
   }
@@ -95,9 +105,23 @@ const getUserByName = username => {
   });
 };
 
-io.on("connection", function(socket) {
-  addChatClient(socket.client);
+// Authorization/preconnection logic
+io.use(async (socket, next) => {
+  const userToken = cookie.parse(socket.request.headers.cookie).chattr_u;
 
+  if (!userToken) next(new Error("No token provided"));
+  const userData = jwt.verify(userToken, "dev");
+  if (!userData) next(new Error("Invalid user token"));
+  console.log(userData);
+  const dbUser = await User.findById(userData.user);
+  socket.user = { username: dbUser.username };
+  if (dbUser) return next();
+  return next(new Error("No user found"));
+});
+
+io.on("connection", function(socket) {
+  console.log(socket.user);
+  addChatClient(socket.client, socket.user);
   socket.emit("user-connected", {
     user: socket.client.user
   });
@@ -169,7 +193,7 @@ app.post("/sign-in", passport.authenticate("local"), (req, res) => {
     },
     "dev"
   );
-  res.json({ login: "success", token });
+  res.cookie("chattr_u", token, { httpOnly: true }).json({ login: "success" });
 });
 
 app.post("/sign-up", (req, res) => {
@@ -181,7 +205,7 @@ app.post("/sign-up", (req, res) => {
     },
     "dev"
   );
-  res.json({ login: "success", token });
+  res.cookie("chattr_u", token, { httpOnly: true }).json({ login: "success" });
 });
 
 http.listen(config.server.port, function() {
