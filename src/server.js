@@ -50,16 +50,16 @@ app.use(passport.initialize());
 app.use(cookieParser());
 app.use(require("express").json());
 console.log(process.env.NODE_ENV);
-if (process.env.NODE_ENV === "production") {
-  app.use(
-    cors({
-      origin: "https://chat-app-client-experiment.now.sh",
-      credentials: true
-    })
-  );
-} else {
-  app.use(cors({ origin: "http://localhost:3000", credentials: true }));
-}
+// if (process.env.NODE_ENV === "production") {
+//   app.use(
+//     cors({
+//       origin: "https://chat-app-client-experiment.now.sh",
+//       credentials: true
+//     })
+//   );
+// } else {
+//   app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+// }
 
 let chatClients = [];
 
