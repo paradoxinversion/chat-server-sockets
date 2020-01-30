@@ -208,7 +208,9 @@ app.post("/sign-in", passport.authenticate("local"), (req, res) => {
   );
   res.cookie("chattr_u", token, { httpOnly: true }).json({ login: "success" });
 });
-
+app.get("/test", (req, res) => {
+  res.send("test");
+});
 app.post("/sign-up", (req, res) => {
   console.log(req.body);
   const newUser = userActions.createUser(req.body);
