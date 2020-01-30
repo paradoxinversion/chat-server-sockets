@@ -199,29 +199,43 @@ io.on("connection", function(socket) {
   });
 });
 
-app.post("/sign-in", passport.authenticate("local"), (req, res) => {
-  const token = jwt.sign(
-    {
-      user: req.user.id
-    },
-    "dev"
-  );
-  res.cookie("chattr_u", token, { httpOnly: true }).json({ login: "success" });
-});
-app.get("/chattr/test", (req, res) => {
-  res.send("test");
-});
-app.post("/sign-up", (req, res) => {
-  console.log(req.body);
-  const newUser = userActions.createUser(req.body);
-  const token = jwt.sign(
-    {
-      user: newUser.id
-    },
-    "dev"
-  );
-  res.cookie("chattr_u", token, { httpOnly: true }).json({ login: "success" });
-});
+app.post(
+  `${process.env.NODE_ENV === "production" ? "/chattr" : ""}/sign-in`,
+  passport.authenticate("local"),
+  (req, res) => {
+    const token = jwt.sign(
+      {
+        user: req.user.id
+      },
+      "dev"
+    );
+    res
+      .cookie("chattr_u", token, { httpOnly: true })
+      .json({ login: "success" });
+  }
+);
+app.get(
+  `${process.env.NODE_ENV === "production" ? "/chattr" : ""}/test`,
+  (req, res) => {
+    res.send("test");
+  }
+);
+app.post(
+  `${process.env.NODE_ENV === "production" ? "/chattr" : ""}/sign-up`,
+  (req, res) => {
+    console.log(req.body);
+    const newUser = userActions.createUser(req.body);
+    const token = jwt.sign(
+      {
+        user: newUser.id
+      },
+      "dev"
+    );
+    res
+      .cookie("chattr_u", token, { httpOnly: true })
+      .json({ login: "success" });
+  }
+);
 
 http.listen(config.server.port, function() {
   console.log(`Listening on port ${config.server.port}`);
