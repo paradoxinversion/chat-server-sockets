@@ -18,11 +18,11 @@ const io = require("socket.io")(http, {
 });
 const userActions = require("./mongo/actions/User");
 const User = require("./mongo/models/User");
-// io.origins("*:*");
-io.origins([
-  "http://localhost:3000",
-  "https://chat-app-client-experiment.now.sh"
-]);
+io.origins("*:*");
+// io.origins([
+//   "http://localhost:3000",
+//   "https://chat-app-client-experiment.now.sh"
+// ]);
 const cors = require("cors");
 
 const database = setupdb(false);
