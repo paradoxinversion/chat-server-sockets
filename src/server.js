@@ -49,7 +49,7 @@ passport.deserializeUser(async function(id, done) {
 app.use(passport.initialize());
 app.use(cookieParser());
 app.use(require("express").json());
-
+console.log(process.env.NODE_ENV);
 if (process.env.NODE_ENV === "production") {
   app.use(
     cors({
