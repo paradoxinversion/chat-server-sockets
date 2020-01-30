@@ -9,9 +9,12 @@ const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
 // const socketAuth = require('socketio-auth');
 
+// const io = require("socket.io")(http, {
+//   cookie: config.server.cookieName,
+//   path: config.server.socketPath
+// });
 const io = require("socket.io")(http, {
-  cookie: config.server.cookieName,
-  path: config.server.socketPath
+  cookie: config.server.cookieName
 });
 const userActions = require("./mongo/actions/User");
 const User = require("./mongo/models/User");
