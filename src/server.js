@@ -56,7 +56,10 @@ const createUser = (clientId, user) => {
   return {
     username: user.username,
     avatar: `https://i.pravatar.cc/150?u=${clientId}`,
-    id: clientId
+    id: clientId,
+    iid: user.iid,
+    blockList: user.blockList,
+    blockedBy: user.blockedBy
   };
 };
 
@@ -92,8 +95,13 @@ const getChatUsers = () => chatClients.map(client => client.user);
 
 const getUserByName = username => {
   return chatClients.find(client => {
-    console.log(client.user.username, username);
     return client.user.username === username;
+  });
+};
+
+const getClientBySocketId = socketId => {
+  return chatClients.find(client => {
+    return client.id === socketId;
   });
 };
 
@@ -106,7 +114,12 @@ io.use(async (socket, next) => {
   if (!userData) next(new Error("Invalid user token"));
 
   const dbUser = await User.findById(userData.user);
-  socket.user = { username: dbUser.username };
+  socket.user = {
+    username: dbUser.username,
+    iid: dbUser.id,
+    blockList: dbUser.blockedUsers,
+    blockedBy: dbUser.blockedBy
+  };
   if (dbUser) return next();
 
   return next(new Error("No user found"));
@@ -120,7 +133,8 @@ io.on("connection", function(socket) {
 
   io.emit("room-user-change", {
     users: getChatUsers(),
-    message: `${socket.client.user.username} has entered the chat room.`
+    message: `${socket.client.user.username} has entered the chat room.`,
+    user: socket.client.user
   });
 
   socket.on("chat-message-sent", function(data) {
@@ -130,7 +144,9 @@ io.on("connection", function(socket) {
       message: data.message,
       time: Date.now(),
       from: data.from || "",
-      to: data.to || ""
+      fromUID: data.fromUID || "",
+      to: data.to || "",
+      toUID: data.toUID || ""
     };
 
     if (data.to) {
@@ -139,6 +155,30 @@ io.on("connection", function(socket) {
     } else {
       io.emit("chat-message-broadcast", message);
     }
+  });
+
+  socket.on("block-user", async function(userSocketId) {
+    const userIID = getClientBySocketId(userSocketId).user.iid;
+    const blockResult = await userActions.addUserToBlockList(
+      socket.client.user.iid,
+      userIID
+    );
+    socket.emit("block-user", { blocklist: blockResult.blocked });
+    io.sockets.sockets[userSocketId].emit("block-user", {
+      blockedBy: blockResult.blockedBy
+    });
+  });
+
+  socket.on("unblock-user", async function(userSocketId) {
+    const userIID = getClientBySocketId(userSocketId).user.iid;
+    const unblockResult = await userActions.removeUserFromBlockList(
+      socket.client.user.iid,
+      userIID
+    );
+    socket.emit("unblock-user", { blocklist: unblockResult.blocked });
+    io.sockets.sockets[userSocketId].emit("unblock-user", {
+      blockedBy: unblockResult.blockedBy
+    });
   });
 
   socket.on("private-chat-initiated", function(userId) {
@@ -173,7 +213,8 @@ io.on("connection", function(socket) {
     io.emit("user-disconnected", { username: socket.client.user });
     io.emit("room-user-change", {
       users: getChatUsers(),
-      message: `${socket.client.user.username} has left the chat room.`
+      message: `${socket.client.user.username} has left the chat room.`,
+      user: socket.client.user
     });
   });
 });
@@ -197,6 +238,13 @@ app.post(`/chattr/sign-up`, (req, res) => {
     "dev"
   );
   res.cookie("chattr_u", token, { httpOnly: true }).json({ login: "success" });
+});
+
+app.get(`/chattr/check-auth`, async (req, res) => {
+  const token = req.cookies.chattr_u;
+  const userData = jwt.verify(token, "dev");
+  const user = await User.findById(userData.user);
+  if (user) res.json({ login: "success" });
 });
 
 http.listen(config.server.port, function() {
