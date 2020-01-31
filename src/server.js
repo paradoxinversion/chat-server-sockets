@@ -7,22 +7,14 @@ const http = require("http").createServer(app);
 const setupdb = require("./mongo/setupdb");
 const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
-// const socketAuth = require('socketio-auth');
 
-// const io = require("socket.io")(http, {
-//   cookie: config.server.cookieName,
-//   path: config.server.socketPath
-// });
 const io = require("socket.io")(http, {
   cookie: config.server.cookieName
 });
 const userActions = require("./mongo/actions/User");
 const User = require("./mongo/models/User");
 io.origins("*:*");
-// io.origins([
-//   "http://localhost:3000",
-//   "https://chat-app-client-experiment.now.sh"
-// ]);
+
 const cors = require("cors");
 
 const database = setupdb(false);
@@ -53,16 +45,6 @@ app.use(passport.initialize());
 app.use(cookieParser());
 app.use(require("express").json());
 console.log(process.env.NODE_ENV);
-// if (process.env.NODE_ENV === "production") {
-//   app.use(
-//     cors({
-//       origin: "https://chat-app-client-experiment.now.sh",
-//       credentials: true
-//     })
-//   );
-// } else {
-//   app.use(cors({ origin: "http://localhost:3000", credentials: true }));
-// }
 
 let chatClients = [];
 
@@ -202,43 +184,27 @@ io.on("connection", function(socket) {
   });
 });
 
-app.post(
-  `${process.env.NODE_ENV === "production" ? "/chattr" : ""}/sign-in`,
-  passport.authenticate("local"),
-  (req, res) => {
-    const token = jwt.sign(
-      {
-        user: req.user.id
-      },
-      "dev"
-    );
-    res
-      .cookie("chattr_u", token, { httpOnly: true })
-      .json({ login: "success" });
-  }
-);
-app.get(
-  `${process.env.NODE_ENV === "production" ? "/chattr" : ""}/test`,
-  (req, res) => {
-    res.send("test");
-  }
-);
-app.post(
-  `${process.env.NODE_ENV === "production" ? "/chattr" : ""}/sign-up`,
-  (req, res) => {
-    console.log(req.body);
-    const newUser = userActions.createUser(req.body);
-    const token = jwt.sign(
-      {
-        user: newUser.id
-      },
-      "dev"
-    );
-    res
-      .cookie("chattr_u", token, { httpOnly: true })
-      .json({ login: "success" });
-  }
-);
+app.post(`/chattr/sign-in`, passport.authenticate("local"), (req, res) => {
+  const token = jwt.sign(
+    {
+      user: req.user.id
+    },
+    "dev"
+  );
+  res.cookie("chattr_u", token, { httpOnly: true }).json({ login: "success" });
+});
+
+app.post(`/chattr/sign-up`, (req, res) => {
+  console.log(req.body);
+  const newUser = userActions.createUser(req.body);
+  const token = jwt.sign(
+    {
+      user: newUser.id
+    },
+    "dev"
+  );
+  res.cookie("chattr_u", token, { httpOnly: true }).json({ login: "success" });
+});
 
 http.listen(config.server.port, function() {
   console.log(`Listening on port ${config.server.port}`);
