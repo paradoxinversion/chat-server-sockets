@@ -1,3 +1,4 @@
+const environment = process.env.NODE_ENV;
 const config = require("./config/config").getConfig();
 const app = require("express")();
 const jwt = require("jsonwebtoken");
@@ -15,7 +16,11 @@ const userActions = require("./mongo/actions/User");
 const User = require("./mongo/models/User");
 io.origins("*:*");
 
-const cors = require("cors");
+// CORS is set in nginx in production
+if (environment !== "production") {
+  const cors = require("cors");
+  app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+}
 
 const database = setupdb(false);
 passport.use(
@@ -44,19 +49,10 @@ passport.deserializeUser(async function(id, done) {
 app.use(passport.initialize());
 app.use(cookieParser());
 app.use(require("express").json());
-console.log(process.env.NODE_ENV);
 
 let chatClients = [];
 
-const createUser = clientId => {
-  return {
-    username: `Anon-${clientId}`,
-    avatar: `https://i.pravatar.cc/150?u=${clientId}`,
-    id: clientId
-  };
-};
-
-const cUser = (clientId, user) => {
+const createUser = (clientId, user) => {
   return {
     username: user.username,
     avatar: `https://i.pravatar.cc/150?u=${clientId}`,
@@ -78,10 +74,8 @@ const addChatClient = (client, user) => {
 
   // If none exists yet, add it
   if (!clientExists) {
-    // client.user = createUser(client.id);
-    client.user = cUser(client.id, user);
+    client.user = createUser(client.id, user);
     chatClients.push(client);
-    console.log(`New chat user entered: ${client.user.username}`);
   }
   return client;
 };
@@ -106,19 +100,19 @@ const getUserByName = username => {
 // Authorization/preconnection logic
 io.use(async (socket, next) => {
   const userToken = cookie.parse(socket.request.headers.cookie).chattr_u;
-
   if (!userToken) next(new Error("No token provided"));
+
   const userData = jwt.verify(userToken, "dev");
   if (!userData) next(new Error("Invalid user token"));
-  console.log(userData);
+
   const dbUser = await User.findById(userData.user);
   socket.user = { username: dbUser.username };
   if (dbUser) return next();
+
   return next(new Error("No user found"));
 });
 
 io.on("connection", function(socket) {
-  console.log(socket.user);
   addChatClient(socket.client, socket.user);
   socket.emit("user-connected", {
     user: socket.client.user
@@ -195,7 +189,6 @@ app.post(`/chattr/sign-in`, passport.authenticate("local"), (req, res) => {
 });
 
 app.post(`/chattr/sign-up`, (req, res) => {
-  console.log(req.body);
   const newUser = userActions.createUser(req.body);
   const token = jwt.sign(
     {
