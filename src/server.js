@@ -59,7 +59,9 @@ const createUser = (clientId, user) => {
     id: clientId,
     iid: user.iid,
     blockList: user.blockList,
-    blockedBy: user.blockedBy
+    blockedBy: user.blockedBy,
+    role: user.role,
+    accountStatus: user.accountStatus
   };
 };
 
@@ -114,11 +116,14 @@ io.use(async (socket, next) => {
   if (!userData) next(new Error("Invalid user token"));
 
   const dbUser = await User.findById(userData.user);
+  if (dbUser.accountStatus == "2") return next(new Error("You are banned."));
   socket.user = {
     username: dbUser.username,
     iid: dbUser.id,
     blockList: dbUser.blockedUsers,
-    blockedBy: dbUser.blockedBy
+    blockedBy: dbUser.blockedBy,
+    role: dbUser.role,
+    accountStatus: dbUser.accountStatus
   };
   if (dbUser) return next();
 
@@ -138,6 +143,9 @@ io.on("connection", function(socket) {
   });
 
   socket.on("chat-message-sent", function(data) {
+    if (socket.client.user.accountStatus > 0) {
+      return; // user is banned, don't bother
+    }
     const message = {
       id: socket.id,
       user: socket.client.user,
@@ -156,7 +164,33 @@ io.on("connection", function(socket) {
       io.emit("chat-message-broadcast", message);
     }
   });
-
+  socket.on("get-banned-users", async function() {
+    const bannedUsers = await userActions.getBannedUsers();
+    socket.emit("get-banned-users", { users: bannedUsers });
+  });
+  socket.on("ban-user", async function(userSocketId) {
+    const userIID = getClientBySocketId(userSocketId).user.iid;
+    const banResult = await userActions.setAccountStatus(userIID, 2);
+    io.emit("ban-user", { bannedUser: banResult.username });
+    io.sockets.sockets[userSocketId].emit("targeted-user-notice", {
+      message: "You have been banned from chat."
+    });
+  });
+  socket.on("change-user-account-status", async function({ userIID, status }) {
+    const statusStrings = {
+      "0": "Normal",
+      "1": "Muted",
+      "2": "Banned"
+    };
+    const statusChange = await userActions.setAccountStatus(userIID, status);
+    io.emit("change-user-account-status", {
+      user: statusChange.username,
+      status: statusStrings[status]
+    });
+    io.sockets.sockets[userSocketId].emit("targeted-user-notice", {
+      message: "Your account status has been set to " + statusStrings[status]
+    });
+  });
   socket.on("block-user", async function(userSocketId) {
     const userIID = getClientBySocketId(userSocketId).user.iid;
     const blockResult = await userActions.addUserToBlockList(

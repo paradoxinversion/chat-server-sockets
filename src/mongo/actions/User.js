@@ -12,12 +12,25 @@ const createUser = async ({ username, password }) => {
   // TODO: Make salt rounds a config option
   const hashedPassword = await bcrypt.hash(password, 10);
 
+  /**
+   * ROLES:
+   * 0 - User
+   * 1 - Mod
+   * 2 - Admin
+   *
+   * ACCOUNT STATUSES:
+   * 0 - Normal
+   * 1 - Muted (Cannot send messages, can view chat)
+   * 2 - Banned (Cannot Enter Chat)
+   */
+
   const newUser = new User({
     username,
     password: hashedPassword,
     role: 0,
     blockedUsers: [],
-    blockedBy: []
+    blockedBy: [],
+    accountStatus: 0
   });
   newUser.save();
   return newUser;
@@ -70,7 +83,6 @@ const removeUserFromBlockList = async (unblockingUserId, unblockedUserId) => {
   }
 };
 const readUser = async ({ username }) => {
-  console.log(username);
   const user = await User.findOne({ username });
   if (!user) {
     const error = new Error("Cannot find that user");
@@ -79,9 +91,41 @@ const readUser = async ({ username }) => {
 
   return user;
 };
+
+const banUser = async userId => {
+  const user = await User.findById(userId);
+  if (!user) {
+    const error = new Error("Cannot find that user");
+    throw error;
+  }
+
+  user.accountStatus = 2;
+  await user.save();
+  return user;
+};
+
+const setAccountStatus = async (userId, status) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    const error = new Error("Cannot find that user");
+    throw error;
+  }
+
+  user.accountStatus = status;
+  await user.save();
+  return user;
+};
+
+const getBannedUsers = async () => {
+  const users = await User.find({ accountStatus: 2 }).select("id username");
+  return users;
+};
 module.exports = {
   createUser,
   readUser,
   addUserToBlockList,
-  removeUserFromBlockList
+  removeUserFromBlockList,
+  banUser,
+  setAccountStatus,
+  getBannedUsers
 };
