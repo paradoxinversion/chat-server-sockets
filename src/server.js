@@ -8,7 +8,7 @@ const http = require("http").createServer(app);
 const setupdb = require("./mongo/setupdb");
 const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
-
+const jdenticon = require("jdenticon");
 const io = require("socket.io")(http, {
   cookie: config.server.cookieName
 });
@@ -55,7 +55,7 @@ let chatClients = [];
 const createUser = (clientId, user) => {
   return {
     username: user.username,
-    avatar: `https://i.pravatar.cc/150?u=${clientId}`,
+    avatar: jdenticon.toPng(user.username, 150),
     id: clientId,
     iid: user.iid,
     blockList: user.blockList,
@@ -164,18 +164,30 @@ io.on("connection", function(socket) {
       io.emit("chat-message-broadcast", message);
     }
   });
+
   socket.on("get-banned-users", async function() {
     const bannedUsers = await userActions.getBannedUsers();
     socket.emit("get-banned-users", { users: bannedUsers });
   });
+
   socket.on("ban-user", async function(userSocketId) {
+    // Get the user's db id
     const userIID = getClientBySocketId(userSocketId).user.iid;
+
+    // ban the user in the db
     const banResult = await userActions.setAccountStatus(userIID, 2);
+
+    // emit the ban to the room (to remove from their user lists)
     io.emit("ban-user", { bannedUser: banResult.username });
-    io.sockets.sockets[userSocketId].emit("targeted-user-notice", {
-      message: "You have been banned from chat."
+
+    // emit the ban to the banned user
+    io.sockets.sockets[userSocketId].emit("account-status-change", {
+      accountStatus: 2
     });
+    // Disconnect the user
+    io.sockets.sockets[userSocketId].disconnect(true);
   });
+
   socket.on("change-user-account-status", async function({ userIID, status }) {
     const statusStrings = {
       "0": "Normal",
@@ -260,7 +272,9 @@ app.post(`/chattr/sign-in`, passport.authenticate("local"), (req, res) => {
     },
     "dev"
   );
-  res.cookie("chattr_u", token, { httpOnly: true }).json({ login: "success" });
+  res
+    .cookie("chattr_u", token, { httpOnly: true, maxAge: 24 * 3600000 })
+    .json({ login: "success" });
 });
 
 app.post(`/chattr/sign-up`, (req, res) => {
@@ -271,16 +285,30 @@ app.post(`/chattr/sign-up`, (req, res) => {
     },
     "dev"
   );
-  res.cookie("chattr_u", token, { httpOnly: true }).json({ login: "success" });
+  res
+    .cookie("chattr_u", token, { httpOnly: true, maxAge: 24 * 3600000 })
+    .json({ login: "success" });
 });
 
 app.get(`/chattr/check-auth`, async (req, res) => {
-  const token = req.cookies.chattr_u;
-  const userData = jwt.verify(token, "dev");
-  const user = await User.findById(userData.user);
-  if (user) res.json({ login: "success" });
+  if (req.cookies.chattr_u) {
+    const token = req.cookies.chattr_u;
+    const userData = jwt.verify(token, "dev");
+    const user = await User.findById(userData.user);
+    if (user) res.json({ login: "success" });
+  } else {
+    res.send(false);
+  }
 });
-
+app.get(`/chattr/logout`, async (req, res) => {
+  if (req.cookies.chattr_u) {
+    res
+      .clearCookie("chattr_u", { httpOnly: true, maxAge: new Date(0) })
+      .send("logout");
+  } else {
+    res.send(false);
+  }
+});
 http.listen(config.server.port, function() {
   console.log(`Listening on port ${config.server.port}`);
 });
