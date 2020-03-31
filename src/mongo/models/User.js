@@ -18,7 +18,8 @@ const UserSchema = new Schema({
   role: String,
   blockedUsers: [{ type: Schema.Types.ObjectId, ref: "User" }],
   blockedBy: [{ type: Schema.Types.ObjectId, ref: "User" }],
-  accountStatus: String
+  accountStatus: String,
+  profilePhotoURL: String
 });
 
 UserSchema.methods.checkPassword = async function(password) {

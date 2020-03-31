@@ -30,7 +30,8 @@ const createUser = async ({ username, password }) => {
     role: 0,
     blockedUsers: [],
     blockedBy: [],
-    accountStatus: 0
+    accountStatus: 0,
+    profilePhotoUrl: ""
   });
   newUser.save();
   return newUser;
@@ -111,6 +112,12 @@ const updatePassword = async (user, password) => {
   await user.save();
 };
 
+const setUserPhoto = async (user, photoURL) => {
+  user.profilePhotoURL = photoURL;
+  await user.save();
+  return user.photoURL;
+};
+
 const setAccountStatus = async (userId, status) => {
   const user = await User.findById(userId);
   if (!user) {
@@ -135,5 +142,6 @@ module.exports = {
   banUser,
   setAccountStatus,
   getBannedUsers,
-  updatePassword
+  updatePassword,
+  setUserPhoto
 };

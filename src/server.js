@@ -61,7 +61,8 @@ const createUser = (clientId, user) => {
     blockList: user.blockList,
     blockedBy: user.blockedBy,
     role: user.role,
-    accountStatus: user.accountStatus
+    accountStatus: user.accountStatus,
+    profilePhotoURL: user.profilePhotoURL
   };
 };
 
@@ -123,7 +124,8 @@ io.use(async (socket, next) => {
     blockList: dbUser.blockedUsers,
     blockedBy: dbUser.blockedBy,
     role: dbUser.role,
-    accountStatus: dbUser.accountStatus
+    accountStatus: dbUser.accountStatus,
+    profilePhotoURL: dbUser.profilePhotoURL
   };
   if (dbUser) return next();
 
@@ -287,6 +289,18 @@ app.post(
   }
 );
 
+app.post(`/chattr/set-photo`, async (req, res) => {
+  console.log("ding");
+  const token = req.cookies.chattr_u;
+  const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
+  const user = await User.findById(userData.user);
+  if (user) {
+    const result = await userActions.setUserPhoto(user, req.body.photoURL);
+    res.json({ result });
+  } else {
+    res.json({ error: "Bad user info!" });
+  }
+});
 app.post(`/chattr/sign-up`, (req, res) => {
   const newUser = userActions.createUser(req.body);
   const token = jwt.sign(
