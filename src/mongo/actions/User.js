@@ -104,6 +104,13 @@ const banUser = async userId => {
   return user;
 };
 
+const updatePassword = async (user, password) => {
+  console.log(user);
+  const hashedPassword = await bcrypt.hash(password, 10);
+  user.password = hashedPassword;
+  await user.save();
+};
+
 const setAccountStatus = async (userId, status) => {
   const user = await User.findById(userId);
   if (!user) {
@@ -127,5 +134,6 @@ module.exports = {
   removeUserFromBlockList,
   banUser,
   setAccountStatus,
-  getBannedUsers
+  getBannedUsers,
+  updatePassword
 };

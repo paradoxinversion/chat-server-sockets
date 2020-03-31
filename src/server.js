@@ -112,7 +112,7 @@ io.use(async (socket, next) => {
   const userToken = cookie.parse(socket.request.headers.cookie).chattr_u;
   if (!userToken) next(new Error("No token provided"));
 
-  const userData = jwt.verify(userToken, "dev");
+  const userData = jwt.verify(userToken, process.env.JWT_SECRET_KEY);
   if (!userData) next(new Error("Invalid user token"));
 
   const dbUser = await User.findById(userData.user);
@@ -265,17 +265,27 @@ io.on("connection", function(socket) {
   });
 });
 
-app.post(`/chattr/sign-in`, passport.authenticate("local"), (req, res) => {
-  const token = jwt.sign(
-    {
-      user: req.user.id
-    },
-    "dev"
-  );
-  res
-    .cookie("chattr_u", token, { httpOnly: true, maxAge: 24 * 3600000 })
-    .json({ login: "success" });
-});
+app.post(
+  `/chattr/sign-in`,
+  passport.authenticate("local"),
+  async (req, res) => {
+    const user = await User.findOne({ username: req.body.username });
+    console.log(user);
+    if (user && (await user.checkPassword(req.body.password))) {
+      const token = jwt.sign(
+        {
+          user: req.user.id
+        },
+        process.env.JWT_SECRET_KEY
+      );
+      res
+        .cookie("chattr_u", token, { httpOnly: true, maxAge: 24 * 3600000 })
+        .json({ login: "success" });
+    } else {
+      res.json({ error: "Incorrect login information!" });
+    }
+  }
+);
 
 app.post(`/chattr/sign-up`, (req, res) => {
   const newUser = userActions.createUser(req.body);
@@ -283,7 +293,7 @@ app.post(`/chattr/sign-up`, (req, res) => {
     {
       user: newUser.id
     },
-    "dev"
+    process.env.JWT_SECRET_KEY
   );
   res
     .cookie("chattr_u", token, { httpOnly: true, maxAge: 24 * 3600000 })
@@ -293,13 +303,14 @@ app.post(`/chattr/sign-up`, (req, res) => {
 app.get(`/chattr/check-auth`, async (req, res) => {
   if (req.cookies.chattr_u) {
     const token = req.cookies.chattr_u;
-    const userData = jwt.verify(token, "dev");
+    const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
     const user = await User.findById(userData.user);
     if (user) res.json({ login: "success" });
   } else {
     res.send(false);
   }
 });
+
 app.get(`/chattr/logout`, async (req, res) => {
   if (req.cookies.chattr_u) {
     res
@@ -309,6 +320,37 @@ app.get(`/chattr/logout`, async (req, res) => {
     res.send(false);
   }
 });
-http.listen(config.server.port, function() {
+
+app.post(`/chattr/update-password`, async (req, res) => {
+  if (req.cookies.chattr_u) {
+    const token = req.cookies.chattr_u;
+    const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    const user = await User.findById(userData.user);
+    if (user) {
+      if (await user.checkPassword(req.body.old)) {
+        await userActions.updatePassword(user, req.body.new);
+        return res.json({ result: "Password Updated" });
+      } else {
+        return res.json({ error: "Incorrect password" });
+      }
+    } else {
+      return res.json({ error: "User does not exist" });
+    }
+  } else {
+    return res.send(false);
+  }
+});
+
+http.listen(config.server.port, async function() {
   console.log(`Listening on port ${config.server.port}`);
+  const admin = await User.findOne({ role: 2 });
+  if (!admin) {
+    console.log(
+      "No Administrator-- Creating default admin. Change the password as soon as possible"
+    );
+    userActions.createUser({
+      username: process.env.DEFAULT_ADMIN_USERNAME,
+      password: process.env.DEFAULT_ADMIN_PASSWORD
+    });
+  }
 });
