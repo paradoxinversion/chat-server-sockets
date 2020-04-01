@@ -137,7 +137,11 @@ io.on("connection", function(socket) {
   socket.emit("user-connected", {
     user: socket.client.user
   });
-
+  socket.emit("chat-message-broadcast", {
+    id: "system",
+    time: Date.now(),
+    message: "Welcome to the chatroom!"
+  });
   io.emit("room-user-change", {
     users: getChatUsers(),
     message: `${socket.client.user.username} has entered the chat room.`,
@@ -148,16 +152,25 @@ io.on("connection", function(socket) {
     if (socket.client.user.accountStatus > 0) {
       return; // user is banned, don't bother
     }
-    const message = {
-      id: socket.id,
-      user: socket.client.user,
-      message: data.message,
-      time: Date.now(),
-      from: data.from || "",
-      fromUID: data.fromUID || "",
-      to: data.to || "",
-      toUID: data.toUID || ""
-    };
+    let message;
+    if (data.isServerMessage) {
+      message = {
+        id: "system",
+        time: Date.now(),
+        message: data.message
+      };
+    } else {
+      message = {
+        id: socket.id,
+        user: socket.client.user,
+        message: data.message,
+        time: Date.now(),
+        from: data.from || "",
+        fromUID: data.fromUID || "",
+        to: data.to || "",
+        toUID: data.toUID || ""
+      };
+    }
 
     if (data.to) {
       socket.to(data.to).emit("pm", message);
@@ -245,12 +258,9 @@ io.on("connection", function(socket) {
     const existingUser = getUserByName(username);
     if (!existingUser) {
       const clientUser = await User.findById(user);
-      console.log("Username:", username);
-      console.log("User:", clientUser);
       const oldName = socket.client.user.username;
       socket.client.user.username = username;
       await userActions.updateUsername(clientUser, username);
-      // socket.emit("set-username", { username: socket.client.user.username });
       io.emit("room-user-change", {
         users: getChatUsers(),
         message: `${oldName} is now ${socket.client.user.username}.`,
@@ -295,7 +305,6 @@ app.post(
 );
 
 app.post(`/chattr/set-photo`, async (req, res) => {
-  console.log("ding");
   const token = req.cookies.chattr_u;
   const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
   const user = await User.findById(userData.user);

@@ -76,7 +76,6 @@ const removeUserFromBlockList = async (unblockingUserId, unblockedUserId) => {
       blockedBy: unblockedUser.blockedBy
     };
   } else {
-    console.log("user not in blocklist");
     return {
       blocked: unblockingUser.blockedUsers,
       blockedBy: unblockedUser.blockedBy
@@ -112,7 +111,6 @@ const updatePassword = async (user, password) => {
 };
 
 const updateUsername = async (user, newUsername) => {
-  console.log(user);
   user.username = newUsername;
   await user.save();
 };
