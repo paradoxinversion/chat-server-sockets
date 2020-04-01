@@ -277,7 +277,7 @@ app.post(
   passport.authenticate("local"),
   async (req, res) => {
     const user = await User.findOne({ username: req.body.username });
-    console.log(user);
+    if (!user.activated) return res.json({ error: "Not activated!" });
     if (user && (await user.checkPassword(req.body.password))) {
       const token = jwt.sign(
         {
@@ -360,6 +360,43 @@ app.post(`/chattr/update-password`, async (req, res) => {
   }
 });
 
+app.get(`/chattr/pending-users`, async (req, res) => {
+  if (req.cookies.chattr_u) {
+    const token = req.cookies.chattr_u;
+    const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    const user = await User.findById(userData.user);
+    if (user) {
+      if (user.role > 0) {
+        const pendingUsers = await userActions.getUnactivatedUsers();
+        return res.json({ pendingUsers });
+      }
+    } else {
+      return res.json({ error: "User does not exist" });
+    }
+  } else {
+    return res.send(false);
+  }
+});
+
+app.post(`/chattr/confirm-user`, async (req, res) => {
+  if (req.cookies.chattr_u) {
+    const token = req.cookies.chattr_u;
+    const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    const user = await User.findById(userData.user);
+    if (user) {
+      if (user.role > 0) {
+        const activationResult = await userActions.activateUser(
+          req.body.userId
+        );
+        return res.json({ activationResult });
+      }
+    } else {
+      return res.json({ error: "User does not exist" });
+    }
+  } else {
+    return res.send(false);
+  }
+});
 http.listen(config.server.port, async function() {
   console.log(`Listening on port ${config.server.port}`);
   const admin = await User.findOne({ role: 2 });
@@ -367,9 +404,12 @@ http.listen(config.server.port, async function() {
     console.log(
       "No Administrator-- Creating default admin. Change the password as soon as possible"
     );
-    userActions.createUser({
+    const adminUser = await userActions.createUser({
       username: process.env.DEFAULT_ADMIN_USERNAME,
       password: process.env.DEFAULT_ADMIN_PASSWORD
     });
+    adminUser.role = 2;
+    adminUser.activated = true;
+    await adminUser.save();
   }
 });

@@ -33,7 +33,7 @@ const createUser = async ({ username, password }) => {
     accountStatus: 0,
     profilePhotoUrl: ""
   });
-  newUser.save();
+  await newUser.save();
   return newUser;
 };
 
@@ -139,6 +139,18 @@ const getBannedUsers = async () => {
   const users = await User.find({ accountStatus: 2 }).select("id username");
   return users;
 };
+
+const getUnactivatedUsers = async () => {
+  const users = await User.find({ activated: false }).select("username id");
+  return users;
+};
+
+const activateUser = async userId => {
+  const user = await User.findById(userId);
+  user.activated = true;
+  await user.save();
+  return { result: "User Activated" };
+};
 module.exports = {
   createUser,
   readUser,
@@ -149,5 +161,7 @@ module.exports = {
   getBannedUsers,
   updatePassword,
   setUserPhoto,
-  updateUsername
+  updateUsername,
+  getUnactivatedUsers,
+  activateUser
 };

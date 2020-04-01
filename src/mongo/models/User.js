@@ -11,6 +11,7 @@ const Schema = mongoose.Schema;
  * 0 - Normal
  * 1 - Muted (Cannot send messages, can view chat)
  * 2 - Banned (Cannot Enter Chat)
+ * 4 - Awaiting Activation
  */
 const UserSchema = new Schema({
   username: String,
@@ -19,7 +20,8 @@ const UserSchema = new Schema({
   blockedUsers: [{ type: Schema.Types.ObjectId, ref: "User" }],
   blockedBy: [{ type: Schema.Types.ObjectId, ref: "User" }],
   accountStatus: String,
-  profilePhotoURL: String
+  profilePhotoURL: String,
+  activated: { type: Boolean, default: false }
 });
 
 UserSchema.methods.checkPassword = async function(password) {
