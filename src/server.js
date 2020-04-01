@@ -3,14 +3,13 @@ const config = require("./config/config").getConfig();
 const app = require("express")();
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
-const cookie = require("cookie");
 const http = require("http").createServer(app);
 const setupdb = require("./mongo/setupdb");
 const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
 const jdenticon = require("jdenticon");
 const io = require("socket.io")(http, {
-  cookie: config.server.cookieName
+  cookie: false
 });
 const userActions = require("./mongo/actions/User");
 const User = require("./mongo/models/User");
@@ -111,7 +110,8 @@ const getClientBySocketId = socketId => {
 // Authorization/preconnection logic
 io.use(async (socket, next) => {
   try {
-    const userToken = cookie.parse(socket.request.headers.cookie).chattr_u;
+    const userToken = socket.handshake.query.token;
+    console.log(userToken);
     if (!userToken) next(new Error("No token provided"));
 
     const userData = jwt.verify(userToken, process.env.JWT_SECRET_KEY);
@@ -133,7 +133,6 @@ io.use(async (socket, next) => {
     return next(new Error("No user found"));
   } catch (e) {
     console.log(e);
-    console.log(socket.request.headers.cookie);
   }
 });
 
@@ -300,63 +299,44 @@ app.post(
         },
         process.env.JWT_SECRET_KEY
       );
-      res
-        .cookie("chattr_u", token, { httpOnly: true, maxAge: 24 * 3600000 })
-        .json({ login: "success" });
+      res.json({ login: "success", token });
     } else {
       res.json({ error: "Incorrect login information!" });
     }
   }
 );
 
-app.post(`/chattr/set-photo`, async (req, res) => {
-  const token = req.cookies.chattr_u;
-  const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
-  const user = await User.findById(userData.user);
-  if (user) {
-    const result = await userActions.setUserPhoto(user, req.body.photoURL);
-    res.json({ result });
-  } else {
-    res.json({ error: "Bad user info!" });
-  }
-});
-app.post(`/chattr/sign-up`, (req, res) => {
-  const newUser = userActions.createUser(req.body);
-  const token = jwt.sign(
-    {
-      user: newUser.id
-    },
-    process.env.JWT_SECRET_KEY
-  );
-  res
-    .cookie("chattr_u", token, { httpOnly: true, maxAge: 24 * 3600000 })
-    .json({ login: "success" });
+app.post(`/chattr/sign-up`, async (req, res) => {
+  await userActions.createUser(req.body);
+  res.json({ signup: "success" });
 });
 
 app.get(`/chattr/check-auth`, async (req, res) => {
-  if (req.cookies.chattr_u) {
-    const token = req.cookies.chattr_u;
-    const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
-    const user = await User.findById(userData.user);
-    if (user) res.json({ login: "success" });
+  const token = req.headers.bearer;
+  if (token) {
+    try {
+      const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
+      const user = await User.findById(userData.user);
+      if (user) res.json({ login: "success" });
+    } catch (e) {
+      return res.send({ error: e.message });
+    }
   } else {
     res.send(false);
   }
 });
 
 app.get(`/chattr/logout`, async (req, res) => {
-  if (req.cookies.chattr_u) {
-    res
-      .clearCookie("chattr_u", { httpOnly: true, maxAge: new Date(0) })
-      .send("logout");
+  if (req.headers.bearer) {
+    res.send("logout");
   } else {
     res.send(false);
   }
 });
 
 app.post(`/chattr/update-password`, async (req, res) => {
-  if (req.cookies.chattr_u) {
-    const token = req.cookies.chattr_u;
+  if (req.headers.bearer) {
+    const token = req.headers.bearer;
     const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
     const user = await User.findById(userData.user);
     if (user) {
@@ -374,9 +354,20 @@ app.post(`/chattr/update-password`, async (req, res) => {
   }
 });
 
+app.post(`/chattr/set-photo`, async (req, res) => {
+  const token = req.headers.bearer;
+  const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
+  const user = await User.findById(userData.user);
+  if (user) {
+    const result = await userActions.setUserPhoto(user, req.body.photoURL);
+    res.json({ result });
+  } else {
+    res.json({ error: "Bad user info!" });
+  }
+});
 app.get(`/chattr/pending-users`, async (req, res) => {
-  if (req.cookies.chattr_u) {
-    const token = req.cookies.chattr_u;
+  if (req.headers.bearer) {
+    const token = req.headers.bearer;
     const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
     const user = await User.findById(userData.user);
     if (user) {
@@ -393,8 +384,8 @@ app.get(`/chattr/pending-users`, async (req, res) => {
 });
 
 app.post(`/chattr/confirm-user`, async (req, res) => {
-  if (req.cookies.chattr_u) {
-    const token = req.cookies.chattr_u;
+  if (req.headers.bearer) {
+    const token = req.headers.bearer;
     const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
     const user = await User.findById(userData.user);
     if (user) {
