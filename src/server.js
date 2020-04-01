@@ -19,14 +19,6 @@ io.origins("*:*");
 if (environment !== "production") {
   const cors = require("cors");
   app.use(cors({ origin: "http://localhost:3000", credentials: true }));
-} else {
-  const cors = require("cors");
-  app.use(
-    cors({
-      origin: "https://chat-app-client-experiment.now.sh/",
-      credentials: true
-    })
-  );
 }
 
 const database = setupdb(false);
