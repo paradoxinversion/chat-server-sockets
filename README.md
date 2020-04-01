@@ -16,6 +16,10 @@ Starts the server in development mode
 
 Starts the server in debug mode. For more info on inspecting node server scripts as they execute, see the [node docs](https://nodejs.org/de/docs/guides/debugging-getting-started/)
 
+## Socket Events VS Rest API
+
+The app uses a mix of socket events and a rest API for functionality. The general operating rule is: If the `thing` directly impacts chat, it should be an event (ie, bans, users joining/leaving, username changes). If it does not, it should be a REST call (ie, sign up, log in, change password).
+
 ## Socket Events
 
 Below are events used by socketio, along with which interface is used. If `socket`, it should only affect the user connected to that socket. If `io`, it should affect all connected sockets.

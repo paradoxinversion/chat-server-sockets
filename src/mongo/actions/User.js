@@ -106,9 +106,14 @@ const banUser = async userId => {
 };
 
 const updatePassword = async (user, password) => {
-  console.log(user);
   const hashedPassword = await bcrypt.hash(password, 10);
   user.password = hashedPassword;
+  await user.save();
+};
+
+const updateUsername = async (user, newUsername) => {
+  console.log(user);
+  user.username = newUsername;
   await user.save();
 };
 
@@ -143,5 +148,6 @@ module.exports = {
   setAccountStatus,
   getBannedUsers,
   updatePassword,
-  setUserPhoto
+  setUserPhoto,
+  updateUsername
 };

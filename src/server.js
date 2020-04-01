@@ -241,15 +241,20 @@ io.on("connection", function(socket) {
     io.to(roomName).emit("private-chat-initiated", roomName);
   });
 
-  socket.on("set-username", function(username) {
-    const existingUser = getUserByName(username.username);
+  socket.on("set-username", async function({ username, user }) {
+    const existingUser = getUserByName(username);
     if (!existingUser) {
+      const clientUser = await User.findById(user);
+      console.log("Username:", username);
+      console.log("User:", clientUser);
       const oldName = socket.client.user.username;
-      socket.client.user.username = username.username;
+      socket.client.user.username = username;
+      await userActions.updateUsername(clientUser, username);
       // socket.emit("set-username", { username: socket.client.user.username });
       io.emit("room-user-change", {
         users: getChatUsers(),
-        message: `${oldName} is now ${socket.client.user.username}.`
+        message: `${oldName} is now ${socket.client.user.username}.`,
+        user: socket.client.user
       });
     } else {
       socket.emit("set-username-error", "Username Taken");
