@@ -110,26 +110,31 @@ const getClientBySocketId = socketId => {
 
 // Authorization/preconnection logic
 io.use(async (socket, next) => {
-  const userToken = cookie.parse(socket.request.headers.cookie).chattr_u;
-  if (!userToken) next(new Error("No token provided"));
+  try {
+    const userToken = cookie.parse(socket.request.headers.cookie).chattr_u;
+    if (!userToken) next(new Error("No token provided"));
 
-  const userData = jwt.verify(userToken, process.env.JWT_SECRET_KEY);
-  if (!userData) next(new Error("Invalid user token"));
+    const userData = jwt.verify(userToken, process.env.JWT_SECRET_KEY);
+    if (!userData) next(new Error("Invalid user token"));
 
-  const dbUser = await User.findById(userData.user);
-  if (dbUser.accountStatus == "2") return next(new Error("You are banned."));
-  socket.user = {
-    username: dbUser.username,
-    iid: dbUser.id,
-    blockList: dbUser.blockedUsers,
-    blockedBy: dbUser.blockedBy,
-    role: dbUser.role,
-    accountStatus: dbUser.accountStatus,
-    profilePhotoURL: dbUser.profilePhotoURL
-  };
-  if (dbUser) return next();
+    const dbUser = await User.findById(userData.user);
+    if (dbUser.accountStatus == "2") return next(new Error("You are banned."));
+    socket.user = {
+      username: dbUser.username,
+      iid: dbUser.id,
+      blockList: dbUser.blockedUsers,
+      blockedBy: dbUser.blockedBy,
+      role: dbUser.role,
+      accountStatus: dbUser.accountStatus,
+      profilePhotoURL: dbUser.profilePhotoURL
+    };
+    if (dbUser) return next();
 
-  return next(new Error("No user found"));
+    return next(new Error("No user found"));
+  } catch (e) {
+    console.log(e);
+    console.log(socket.request.headers.cookie);
+  }
 });
 
 io.on("connection", function(socket) {
