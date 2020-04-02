@@ -115,6 +115,11 @@ const updateUsername = async (user, newUsername) => {
   await user.save();
 };
 
+/**
+ *
+ * @param {*} user - User db object
+ * @param {*} photoURL
+ */
 const setUserPhoto = async (user, photoURL) => {
   user.profilePhotoURL = photoURL;
   await user.save();

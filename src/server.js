@@ -274,6 +274,17 @@ io.on("connection", function(socket) {
     }
   });
 
+  socket.on("set-user-photo", async function({ userId, photoURL }) {
+    const user = await User.findById(userId);
+    console.log(user);
+    if (user) {
+      await userActions.setUserPhoto(user, photoURL);
+      socket.client.user.profilePhotoURL = photoURL;
+      io.emit("room-user-update", {
+        users: getChatUsers()
+      });
+    }
+  });
   socket.on("disconnect", function() {
     removeChatClient(socket.id);
     io.emit("user-disconnected", { username: socket.client.user });
@@ -285,25 +296,21 @@ io.on("connection", function(socket) {
   });
 });
 
-app.post(
-  `/chattr/sign-in`,
-  passport.authenticate("local"),
-  async (req, res) => {
-    const user = await User.findOne({ username: req.body.username });
+app.post(`/chattr/sign-in`, async (req, res) => {
+  const user = await User.findOne({ username: req.body.username });
+  if (user && (await user.checkPassword(req.body.password))) {
     if (!user.activated) return res.json({ error: "Not activated!" });
-    if (user && (await user.checkPassword(req.body.password))) {
-      const token = jwt.sign(
-        {
-          user: req.user.id
-        },
-        process.env.JWT_SECRET_KEY
-      );
-      res.status(200).json({ login: "success", token });
-    } else {
-      res.status(401).json({ error: "Incorrect login information!" });
-    }
+    const token = jwt.sign(
+      {
+        user: user.id
+      },
+      process.env.JWT_SECRET_KEY
+    );
+    res.status(200).json({ login: "success", token });
+  } else {
+    res.status(401).json({ error: "Incorrect username or password." });
   }
-);
+});
 
 app.post(`/chattr/sign-up`, async (req, res) => {
   await userActions.createUser(req.body);
@@ -316,7 +323,7 @@ app.get(`/chattr/check-auth`, async (req, res) => {
     try {
       const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
       const user = await User.findById(userData.user);
-      if (user) res.json({ login: "success" });
+      if (user) res.status(200).json({ login: "success" });
     } catch (e) {
       return res.status(400).send({ error: e.message });
     }
@@ -327,7 +334,8 @@ app.get(`/chattr/check-auth`, async (req, res) => {
 
 app.get(`/chattr/logout`, async (req, res) => {
   if (req.headers.bearer) {
-    res.status(400).json({ logout: "success" });
+    // console.log(req.headers.)
+    return res.status(200).json({ logout: "success" });
   } else {
     return res.status(401).json({ error: "Request missing access token" });
   }
