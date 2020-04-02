@@ -276,7 +276,6 @@ io.on("connection", function(socket) {
 
   socket.on("set-user-photo", async function({ userId, photoURL }) {
     const user = await User.findById(userId);
-    console.log(user);
     if (user) {
       await userActions.setUserPhoto(user, photoURL);
       socket.client.user.profilePhotoURL = photoURL;
@@ -299,7 +298,10 @@ io.on("connection", function(socket) {
 app.post(`/chattr/sign-in`, async (req, res) => {
   const user = await User.findOne({ username: req.body.username });
   if (user && (await user.checkPassword(req.body.password))) {
-    if (!user.activated) return res.json({ error: "Not activated!" });
+    if (!user.activated)
+      return res
+        .status(403)
+        .json({ error: "Your account has not yet been activated." });
     const token = jwt.sign(
       {
         user: user.id
@@ -313,6 +315,11 @@ app.post(`/chattr/sign-in`, async (req, res) => {
 });
 
 app.post(`/chattr/sign-up`, async (req, res) => {
+  if (req.body.password.length < 4) {
+    return res
+      .status(400)
+      .json({ error: "Passwords must be at least four characters." });
+  }
   await userActions.createUser(req.body);
   res.status(200).json({ signup: "success" });
 });
@@ -323,7 +330,81 @@ app.get(`/chattr/check-auth`, async (req, res) => {
     try {
       const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
       const user = await User.findById(userData.user);
-      if (user) res.status(200).json({ login: "success" });
+      if (user) {
+        if (user.accountStatus === "2") {
+          return res.status(403).json({ error: "You are banned from chat." });
+        }
+        return res.status(200).json({ login: "success" });
+      }
+    } catch (e) {
+      return res.status(400).send({ error: e.message });
+    }
+  } else {
+    return res.status(400).send("No token found. You can ignore this error.");
+  }
+});
+
+app.get("/chattr/banned-users", async (req, res) => {
+  const token = req.headers.bearer;
+  if (token) {
+    try {
+      const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
+      const user = await User.findById(userData.user);
+      if (user.role > 0) {
+        const users = await userActions.getBannedUsers();
+        res.status(200).json({ users });
+      } else {
+        res
+          .status(403)
+          .json("You do not have sufficient rights to access these records.");
+      }
+    } catch (e) {
+      return res.status(400).send({ error: e.message });
+    }
+  } else {
+    return res.status(401).json({ error: "Request missing access token" });
+  }
+});
+
+app.get("/chattr/users", async (req, res) => {
+  const token = req.headers.bearer;
+  if (token) {
+    try {
+      const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
+      const user = await User.findById(userData.user);
+      if (user.role > 0) {
+        const users = await userActions.getUsers();
+
+        res.status(200).json({ users });
+      } else {
+        res
+          .status(403)
+          .json("You do not have sufficient rights to access these records.");
+      }
+    } catch (e) {
+      return res.status(400).send({ error: e.message });
+    }
+  } else {
+    return res.status(401).json({ error: "Request missing access token" });
+  }
+});
+
+app.delete("/chattr/user", async (req, res) => {
+  const token = req.headers.bearer;
+  if (token) {
+    try {
+      const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
+      const user = await User.findById(userData.user);
+      if (user.role === "2") {
+        const deletingUser = await User.findById(req.body.userId);
+        const result = await userActions.deleteUser(req.body.userId);
+
+        res.status(200).json({ result });
+      } else {
+        res
+          .status(403)
+          .json("You do not have sufficient rights to modify these records.");
+      }
     } catch (e) {
       return res.status(400).send({ error: e.message });
     }
@@ -334,7 +415,6 @@ app.get(`/chattr/check-auth`, async (req, res) => {
 
 app.get(`/chattr/logout`, async (req, res) => {
   if (req.headers.bearer) {
-    // console.log(req.headers.)
     return res.status(200).json({ logout: "success" });
   } else {
     return res.status(401).json({ error: "Request missing access token" });
@@ -347,6 +427,10 @@ app.post(`/chattr/update-password`, async (req, res) => {
     const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
     const user = await User.findById(userData.user);
     if (user) {
+      if (req.body.new.length < 4)
+        return res
+          .status(400)
+          .json({ error: "Passwords must be at least four characters." });
       if (await user.checkPassword(req.body.old)) {
         await userActions.updatePassword(user, req.body.new);
         return res.status(200).json({ result: "Password Updated" });

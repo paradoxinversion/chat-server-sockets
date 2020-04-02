@@ -148,11 +148,21 @@ const getUnactivatedUsers = async () => {
   return users;
 };
 
+const getUsers = async () => {
+  return await User.find({}).select("id username");
+};
 const activateUser = async userId => {
   const user = await User.findById(userId);
   user.activated = true;
   await user.save();
   return { result: "User Activated" };
+};
+
+const deleteUser = async userId => {
+  const deletedUser = await User.findByIdAndDelete(userId);
+  return {
+    result: `${deletedUser.username} has been deleted from the database`
+  };
 };
 module.exports = {
   createUser,
@@ -166,5 +176,7 @@ module.exports = {
   setUserPhoto,
   updateUsername,
   getUnactivatedUsers,
-  activateUser
+  activateUser,
+  getUsers,
+  deleteUser
 };
