@@ -111,7 +111,6 @@ const getClientBySocketId = socketId => {
 io.use(async (socket, next) => {
   try {
     const userToken = socket.handshake.query.token;
-    console.log(userToken);
     if (!userToken) next(new Error("No token provided"));
 
     const userData = jwt.verify(userToken, process.env.JWT_SECRET_KEY);
@@ -299,16 +298,16 @@ app.post(
         },
         process.env.JWT_SECRET_KEY
       );
-      res.json({ login: "success", token });
+      res.status(200).json({ login: "success", token });
     } else {
-      res.json({ error: "Incorrect login information!" });
+      res.status(401).json({ error: "Incorrect login information!" });
     }
   }
 );
 
 app.post(`/chattr/sign-up`, async (req, res) => {
   await userActions.createUser(req.body);
-  res.json({ signup: "success" });
+  res.status(200).json({ signup: "success" });
 });
 
 app.get(`/chattr/check-auth`, async (req, res) => {
@@ -319,18 +318,18 @@ app.get(`/chattr/check-auth`, async (req, res) => {
       const user = await User.findById(userData.user);
       if (user) res.json({ login: "success" });
     } catch (e) {
-      return res.send({ error: e.message });
+      return res.status(400).send({ error: e.message });
     }
   } else {
-    res.send(false);
+    return res.status(401).json({ error: "Request missing access token" });
   }
 });
 
 app.get(`/chattr/logout`, async (req, res) => {
   if (req.headers.bearer) {
-    res.send("logout");
+    res.status(400).json({ logout: "success" });
   } else {
-    res.send(false);
+    return res.status(401).json({ error: "Request missing access token" });
   }
 });
 
@@ -342,15 +341,15 @@ app.post(`/chattr/update-password`, async (req, res) => {
     if (user) {
       if (await user.checkPassword(req.body.old)) {
         await userActions.updatePassword(user, req.body.new);
-        return res.json({ result: "Password Updated" });
+        return res.status(200).json({ result: "Password Updated" });
       } else {
-        return res.json({ error: "Incorrect password" });
+        return res.status(401).json({ error: "Incorrect password" });
       }
     } else {
-      return res.json({ error: "User does not exist" });
+      return res.status(404).json({ error: "User does not exist" });
     }
   } else {
-    return res.send(false);
+    return res.status(401).json({ error: "Request missing access token" });
   }
 });
 
@@ -360,9 +359,9 @@ app.post(`/chattr/set-photo`, async (req, res) => {
   const user = await User.findById(userData.user);
   if (user) {
     const result = await userActions.setUserPhoto(user, req.body.photoURL);
-    res.json({ result });
+    res.status(200).json({ result });
   } else {
-    res.json({ error: "Bad user info!" });
+    return res.status(404).json({ error: "User does not exist" });
   }
 });
 app.get(`/chattr/pending-users`, async (req, res) => {
@@ -373,13 +372,13 @@ app.get(`/chattr/pending-users`, async (req, res) => {
     if (user) {
       if (user.role > 0) {
         const pendingUsers = await userActions.getUnactivatedUsers();
-        return res.json({ pendingUsers });
+        return res.status(200).json({ pendingUsers });
       }
     } else {
-      return res.json({ error: "User does not exist" });
+      return res.status(404).json({ error: "User does not exist" });
     }
   } else {
-    return res.send(false);
+    return res.status(401).json({ error: "Request missing access token" });
   }
 });
 
@@ -393,13 +392,13 @@ app.post(`/chattr/confirm-user`, async (req, res) => {
         const activationResult = await userActions.activateUser(
           req.body.userId
         );
-        return res.json({ activationResult });
+        return res.status(200).json({ activationResult });
       }
     } else {
-      return res.json({ error: "User does not exist" });
+      return res.status(404).json({ error: "User does not exist" });
     }
   } else {
-    return res.send(false);
+    return res.status(401).json({ error: "Request missing access token" });
   }
 });
 http.listen(config.server.port, async function() {
