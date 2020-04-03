@@ -56,7 +56,9 @@ const createUser = (clientId, user) => {
     username: user.username,
     avatar: jdenticon.toPng(user.username, 150),
     id: clientId,
+    socketId: clientId,
     iid: user.iid,
+    userId: user.userId,
     blockList: user.blockList,
     blockedBy: user.blockedBy,
     role: user.role,
@@ -121,6 +123,7 @@ io.use(async (socket, next) => {
     socket.user = {
       username: dbUser.username,
       iid: dbUser.id,
+      userId: dbUser.id,
       blockList: dbUser.blockedUsers,
       blockedBy: dbUser.blockedBy,
       role: dbUser.role,
