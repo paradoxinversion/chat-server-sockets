@@ -57,6 +57,12 @@ const addUserToBlockList = async (blockingUserId, blockedUserId) => {
     };
   }
 };
+
+/**
+ * Remove a user from another's blocklisdt
+ * @param {*} unblockingUserId
+ * @param {*} unblockedUserId
+ */
 const removeUserFromBlockList = async (unblockingUserId, unblockedUserId) => {
   const unblockingUser = await User.findById(unblockingUserId);
   if (unblockingUser.blockedUsers.includes(unblockedUserId)) {
@@ -164,6 +170,12 @@ const deleteUser = async userId => {
     result: `${deletedUser.username} has been deleted from the database`
   };
 };
+
+const getUsernameFromId = async userId => {
+  return await User.findById(userId)
+    .select("username")
+    .lean();
+};
 module.exports = {
   createUser,
   readUser,
@@ -178,5 +190,6 @@ module.exports = {
   getUnactivatedUsers,
   activateUser,
   getUsers,
-  deleteUser
+  deleteUser,
+  getUsernameFromId
 };

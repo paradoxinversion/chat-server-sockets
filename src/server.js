@@ -59,8 +59,8 @@ const createUser = (clientId, user) => {
     socketId: clientId,
     iid: user.iid,
     userId: user.userId,
-    blockList: user.blockList,
-    blockedBy: user.blockedBy,
+    blockList: user.blockList.map(user => user._id.toString()),
+    blockedBy: user.blockedBy.map(user => user._id.toString()),
     role: user.role,
     accountStatus: user.accountStatus,
     profilePhotoURL: user.profilePhotoURL
@@ -82,6 +82,7 @@ const addChatClient = (client, user) => {
   // If none exists yet, add it
   if (!clientExists) {
     client.user = createUser(client.id, user);
+
     chatClients.push(client);
   }
   return client;
@@ -109,6 +110,10 @@ const getClientBySocketId = socketId => {
   });
 };
 
+const getClientByUserId = userId => {
+  return chatClients.find(client => client.user.userId === userId);
+};
+
 // Authorization/preconnection logic
 io.use(async (socket, next) => {
   try {
@@ -119,6 +124,7 @@ io.use(async (socket, next) => {
     if (!userData) next(new Error("Invalid user token"));
 
     const dbUser = await User.findById(userData.user);
+
     if (dbUser.accountStatus == "2") return next(new Error("You are banned."));
     socket.user = {
       username: dbUser.username,
@@ -140,14 +146,17 @@ io.use(async (socket, next) => {
 
 io.on("connection", function(socket) {
   addChatClient(socket.client, socket.user);
+
   socket.emit("user-connected", {
     user: socket.client.user
   });
+
   socket.emit("chat-message-broadcast", {
     id: "system",
     time: Date.now(),
     message: "Welcome to the chatroom!"
   });
+
   io.emit("room-user-change", {
     users: getChatUsers(),
     message: `${socket.client.user.username} has entered the chat room.`,
@@ -224,28 +233,46 @@ io.on("connection", function(socket) {
       message: "Your account status has been set to " + statusStrings[status]
     });
   });
-  socket.on("block-user", async function(userSocketId) {
-    const userIID = getClientBySocketId(userSocketId).user.iid;
+
+  socket.on("block-user", async function({ userId }) {
     const blockResult = await userActions.addUserToBlockList(
-      socket.client.user.iid,
-      userIID
+      socket.client.user.userId,
+      userId
     );
-    socket.emit("block-user", { blocklist: blockResult.blocked });
-    io.sockets.sockets[userSocketId].emit("block-user", {
-      blockedBy: blockResult.blockedBy
+
+    const newBlocklist = blockResult.blocked.map(async user => {
+      return {
+        userId: user.id,
+        username: user.username
+      };
+    });
+    debugger;
+    socket.emit("block-user", {
+      blocklist: newBlocklist
+    });
+    const blockedUserClient = getClientByUserId(userId);
+    io.sockets.sockets[getClientByUserId(userId).id].emit("block-user", {
+      blockedBy: blockResult.blockedBy.map(async user => {
+        return {
+          userId: user,
+          username: await userActions.getUsernameFromId(user)
+        };
+      })
     });
   });
 
-  socket.on("unblock-user", async function(userSocketId) {
-    const userIID = getClientBySocketId(userSocketId).user.iid;
+  socket.on("unblock-user", async function(userId) {
     const unblockResult = await userActions.removeUserFromBlockList(
       socket.client.user.iid,
-      userIID
+      userId
     );
+
     socket.emit("unblock-user", { blocklist: unblockResult.blocked });
-    io.sockets.sockets[userSocketId].emit("unblock-user", {
-      blockedBy: unblockResult.blockedBy
-    });
+    if (getClientByUserId(userId)) {
+      io.sockets.sockets[getClientByUserId(userId).id].emit("unblock-user", {
+        blockedBy: unblockResult.blockedBy
+      });
+    }
   });
 
   socket.on("private-chat-initiated", function(userId) {
@@ -392,6 +419,32 @@ app.get("/chattr/users", async (req, res) => {
   }
 });
 
+app.get("/chattr/current-usernames", async (req, res) => {
+  const token = req.headers.bearer;
+  if (token) {
+    try {
+      const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
+      const user = await User.findById(userData.user);
+      if (user.activated) {
+        const names = req.params.userIds.map(async id => {
+          const user = await User.findById(id);
+          if (user) return { userId: user.id, username: user.username };
+        });
+
+        res.status(200).json({ names });
+      } else {
+        res
+          .status(403)
+          .json("You do not have sufficient rights to access these records.");
+      }
+    } catch (e) {
+      return res.status(400).send({ error: e.message });
+    }
+  } else {
+    return res.status(401).json({ error: "Request missing access token" });
+  }
+});
+
 app.delete("/chattr/user", async (req, res) => {
   const token = req.headers.bearer;
   if (token) {
@@ -476,7 +529,23 @@ app.get(`/chattr/pending-users`, async (req, res) => {
     return res.status(401).json({ error: "Request missing access token" });
   }
 });
-
+app.get(`/chattr/blocked-users`, async (req, res) => {
+  if (req.headers.bearer) {
+    const token = req.headers.bearer;
+    const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    const user = await User.findById(userData.user);
+    if (user) {
+      if (user.role > 0) {
+        const pendingUsers = await userActions.getUnactivatedUsers();
+        return res.status(200).json({ pendingUsers });
+      }
+    } else {
+      return res.status(404).json({ error: "User does not exist" });
+    }
+  } else {
+    return res.status(401).json({ error: "Request missing access token" });
+  }
+});
 app.post(`/chattr/confirm-user`, async (req, res) => {
   if (req.headers.bearer) {
     const token = req.headers.bearer;
