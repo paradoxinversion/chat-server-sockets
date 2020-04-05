@@ -160,7 +160,6 @@ io.on("connection", function(socket) {
     user: socket.client.user,
     chatHistory: chatHistory.map(entry => {
       const chatEntry = { ...entry };
-      debugger;
       if (chatEntry.id !== "system")
         entry.user.avatar = jdenticon.toPng(entry.user.username, 150);
       return chatEntry;
