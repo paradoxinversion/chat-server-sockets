@@ -240,16 +240,14 @@ io.on("connection", function(socket) {
       userId
     );
 
-    const newBlocklist = blockResult.blocked.map(async user => {
-      return {
-        userId: user.id,
-        username: user.username
-      };
-    });
-    debugger;
+    // const newBlocklist = await Promise.all(
+    //   blockResult.blocked.map(async user => user.)
+    // );
+
     socket.emit("block-user", {
-      blocklist: newBlocklist
+      blocklist: blockResult.blocked
     });
+
     const blockedUserClient = getClientByUserId(userId);
     io.sockets.sockets[getClientByUserId(userId).id].emit("block-user", {
       blockedBy: blockResult.blockedBy.map(async user => {
@@ -419,18 +417,19 @@ app.get("/chattr/users", async (req, res) => {
   }
 });
 
-app.get("/chattr/current-usernames", async (req, res) => {
+app.get("/chattr/blocked-users", async (req, res) => {
   const token = req.headers.bearer;
   if (token) {
     try {
       const userData = jwt.verify(token, process.env.JWT_SECRET_KEY);
       const user = await User.findById(userData.user);
       if (user.activated) {
-        const names = req.params.userIds.map(async id => {
-          const user = await User.findById(id);
-          if (user) return { userId: user.id, username: user.username };
-        });
-
+        const names = await Promise.all(
+          req.query.userIds.map(async id => {
+            const user = await User.findById(id);
+            if (user) return { userId: user.id, username: user.username };
+          })
+        );
         res.status(200).json({ names });
       } else {
         res
