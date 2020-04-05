@@ -125,7 +125,6 @@ io.use(async (socket, next) => {
     if (!userData) next(new Error("Invalid user token"));
 
     const dbUser = await User.findById(userData.user);
-    console.log(chatHistory);
     if (dbUser.accountStatus == "2") return next(new Error("You are banned."));
     socket.user = {
       username: dbUser.username,
@@ -163,7 +162,7 @@ io.on("connection", function(socket) {
       const chatEntry = { ...entry };
       debugger;
       if (chatEntry.id !== "system")
-        entry.user.avatar = jdenticon.toPng(socket.client.user.username, 150);
+        entry.user.avatar = jdenticon.toPng(entry.user.username, 150);
       return chatEntry;
     })
   });
@@ -220,7 +219,7 @@ io.on("connection", function(socket) {
           profilePhotoURL: message.user.profilePhotoURL
         };
       }
-      if (chatHistory.length > 5) {
+      if (chatHistory.length > 100) {
         chatHistory.shift();
       }
       chatHistory.push(historyEntry);
