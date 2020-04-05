@@ -50,6 +50,7 @@ app.use(cookieParser());
 app.use(require("express").json());
 
 let chatClients = [];
+let chatHistory = [];
 
 const createUser = (clientId, user) => {
   return {
@@ -124,7 +125,7 @@ io.use(async (socket, next) => {
     if (!userData) next(new Error("Invalid user token"));
 
     const dbUser = await User.findById(userData.user);
-
+    console.log(chatHistory);
     if (dbUser.accountStatus == "2") return next(new Error("You are banned."));
     socket.user = {
       username: dbUser.username,
@@ -147,8 +148,24 @@ io.use(async (socket, next) => {
 io.on("connection", function(socket) {
   addChatClient(socket.client, socket.user);
 
+  // socket.emit("user-connected", {
+  //   user: socket.client.user,
+  //   chatHistory: chatHistory.map(entry => {
+  //     return {
+  //       ...entry,
+  //       user: { avatar: jdenticon.toPng(user.username, 150) }
+  //     };
+  //   })
+  // });
   socket.emit("user-connected", {
-    user: socket.client.user
+    user: socket.client.user,
+    chatHistory: chatHistory.map(entry => {
+      const chatEntry = { ...entry };
+      debugger;
+      if (chatEntry.id !== "system")
+        entry.user.avatar = jdenticon.toPng(socket.client.user.username, 150);
+      return chatEntry;
+    })
   });
 
   socket.emit("chat-message-broadcast", {
@@ -192,6 +209,21 @@ io.on("connection", function(socket) {
       socket.emit("pm", message);
     } else {
       io.emit("chat-message-broadcast", message);
+      const historyEntry = {
+        ...message
+      };
+
+      if (historyEntry.id !== "system") {
+        historyEntry.user = {
+          userId: message.user.userId,
+          username: message.user.username,
+          profilePhotoURL: message.user.profilePhotoURL
+        };
+      }
+      if (chatHistory.length > 5) {
+        chatHistory.shift();
+      }
+      chatHistory.push(historyEntry);
     }
   });
 
@@ -218,13 +250,13 @@ io.on("connection", function(socket) {
     io.sockets.sockets[userSocketId].disconnect(true);
   });
 
-  socket.on("change-user-account-status", async function({ userIID, status }) {
+  socket.on("change-user-account-status", async function({ userId, status }) {
     const statusStrings = {
       "0": "Normal",
       "1": "Muted",
       "2": "Banned"
     };
-    const statusChange = await userActions.setAccountStatus(userIID, status);
+    const statusChange = await userActions.setAccountStatus(userId, status);
     io.emit("change-user-account-status", {
       user: statusChange.username,
       status: statusStrings[status]
@@ -250,12 +282,7 @@ io.on("connection", function(socket) {
 
     const blockedUserClient = getClientByUserId(userId);
     io.sockets.sockets[getClientByUserId(userId).id].emit("block-user", {
-      blockedBy: blockResult.blockedBy.map(async user => {
-        return {
-          userId: user,
-          username: await userActions.getUsernameFromId(user)
-        };
-      })
+      blockedBy: blockResult.blockedBy
     });
   });
 
