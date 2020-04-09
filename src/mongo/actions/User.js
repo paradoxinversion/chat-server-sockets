@@ -1,16 +1,19 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 
-const createUser = async ({ username, password }) => {
+/**
+ * Creates a new user with the provided name and password,
+ * defaulting to a basic role unless one is provided.
+ * @param {*} param0
+ * @returns The new user object
+ */
+const createUser = async ({ username, password, role = 0 }) => {
   const user = await User.findOne({ username });
   if (user) {
     // User exists
     const error = new Error("user exists");
     throw error;
   }
-
-  // TODO: Make salt rounds a config option
-  const hashedPassword = await bcrypt.hash(password, 10);
 
   /**
    * ROLES:
@@ -26,18 +29,32 @@ const createUser = async ({ username, password }) => {
 
   const newUser = new User({
     username,
-    password: hashedPassword,
-    role: 0,
+    password,
+    role,
     blockedUsers: [],
     blockedBy: [],
     accountStatus: 0,
-    profilePhotoUrl: ""
+    profilePhotoUrl: "",
   });
   await newUser.save();
   return newUser;
 };
 
+/**
+ * Adds the blocked user the the blocking user's blocklist.
+ * Also adds the blocking user to the blocked users blockedBy list.
+ * @param {*} blockingUserId - The id of the user initiating the block
+ * @param {*} blockedUserId - The id of the user being blocked
+ * @returns An object containing two arrays: the users the blocking user has blocked,
+ * and the users the blocked user has been blocked by
+ */
 const addUserToBlockList = async (blockingUserId, blockedUserId) => {
+  if (!blockedUserId || !blockedUserId) {
+    const err = new Error(
+      "Blocking or blocked user is missing from addUserToBlockList parameters."
+    );
+    throw err;
+  }
   const blockingUser = await User.findById(blockingUserId);
   if (!blockingUser.blockedUsers.includes(blockedUserId)) {
     const blockedUser = await User.findById(blockedUserId);
@@ -48,12 +65,12 @@ const addUserToBlockList = async (blockingUserId, blockedUserId) => {
 
     return {
       blocked: blockingUser.blockedUsers,
-      blockedBy: blockedUser.blockedBy
+      blockedBy: blockedUser.blockedBy,
     };
   } else {
     return {
       blocked: blockingUser.blockedUsers,
-      blockedBy: blockedUser.blockedBy
+      blockedBy: blockedUser.blockedBy,
     };
   }
 };
@@ -62,6 +79,8 @@ const addUserToBlockList = async (blockingUserId, blockedUserId) => {
  * Remove a user from another's blocklisdt
  * @param {*} unblockingUserId
  * @param {*} unblockedUserId
+ * @returns An object containing two arrays: the users the blocking user has blocked,
+ * and the users the blocked user has been blocked by
  */
 const removeUserFromBlockList = async (unblockingUserId, unblockedUserId) => {
   const unblockingUser = await User.findById(unblockingUserId);
@@ -78,17 +97,25 @@ const removeUserFromBlockList = async (unblockingUserId, unblockedUserId) => {
     await unblockingUser.save();
     await unblockedUser.save();
     return {
+      result: 1,
       blocked: unblockingUser.blockedUsers,
-      blockedBy: unblockedUser.blockedBy
+      blockedBy: unblockedUser.blockedBy,
     };
   } else {
     return {
+      result: 0,
       blocked: unblockingUser.blockedUsers,
-      blockedBy: unblockedUser.blockedBy
+      blockedBy: unblockedUser.blockedBy,
     };
   }
 };
-const readUser = async ({ username }) => {
+
+/**
+ * Retrieves a user from the Database by Username
+ * @param {*} username
+ * @returns The user object
+ */
+const readUser = async (username) => {
   const user = await User.findOne({ username });
   if (!user) {
     const error = new Error("Cannot find that user");
@@ -98,7 +125,11 @@ const readUser = async ({ username }) => {
   return user;
 };
 
-const banUser = async userId => {
+/**
+ * Sets a user's account status to baend (2), and returns that user
+ * @param {*} userId
+ */
+const banUser = async (userId) => {
   const user = await User.findById(userId);
   if (!user) {
     const error = new Error("Cannot find that user");
@@ -110,29 +141,56 @@ const banUser = async userId => {
   return user;
 };
 
+/**
+ * Updates a user's password.
+ * @param {*} user
+ * @param {*} password
+ * @returns A object with a truthy result
+ */
 const updatePassword = async (user, password) => {
   const hashedPassword = await bcrypt.hash(password, 10);
   user.password = hashedPassword;
   await user.save();
-};
-
-const updateUsername = async (user, newUsername) => {
-  user.username = newUsername;
-  await user.save();
+  return { result: 1 };
 };
 
 /**
- *
+ * Updates a user's username
+ * @param {*} user
+ * @param {*} newUsername
+ *  @returns A object with a truthy result
+ */
+const updateUsername = async (user, newUsername) => {
+  user.username = newUsername;
+  await user.save();
+  return { result: 1 };
+};
+
+/**
+ * Sets a user's profile photo url
  * @param {*} user - User db object
  * @param {*} photoURL
+ * @returns A object with a truthy result and the set url
  */
 const setUserPhoto = async (user, photoURL) => {
   user.profilePhotoURL = photoURL;
   await user.save();
-  return user.photoURL;
+  return { result: 1, url: user.profilePhotoURL };
 };
 
+/**
+ * Sets a user's account status
+ * @param {*} userId
+ * @param {*} status
+ * @returns The user who's status has changed
+ */
 const setAccountStatus = async (userId, status) => {
+  if (!status) {
+    const error = new Error(
+      "No status included in setAccountStatus parameters."
+    );
+    throw error;
+  }
   const user = await User.findById(userId);
   if (!user) {
     const error = new Error("Cannot find that user");
@@ -144,37 +202,72 @@ const setAccountStatus = async (userId, status) => {
   return user;
 };
 
+/**
+ * Gets banned users
+ * @returns An array of objects cotaining the id's and userames of banned users
+ */
 const getBannedUsers = async () => {
   const users = await User.find({ accountStatus: 2 }).select("id username");
   return users;
 };
 
+/**
+ * Gets users not yet activated
+ * @returns An array of objects cotaining the id's and userames of unactivated users
+ */
 const getUnactivatedUsers = async () => {
   const users = await User.find({ activated: false }).select("username id");
   return users;
 };
 
+/**
+ * Gets all users
+ * @returns An array of objects cotaining the id's and userames of all users
+ */
 const getUsers = async () => {
   return await User.find({}).select("id username");
 };
-const activateUser = async userId => {
+
+/**
+ * Activates a user in the database.
+ * @param {*} userId
+ * @returns a object with the result of the activation
+ */
+const activateUser = async (userId) => {
   const user = await User.findById(userId);
   user.activated = true;
   await user.save();
   return { result: "User Activated" };
 };
 
-const deleteUser = async userId => {
-  const deletedUser = await User.findByIdAndDelete(userId);
-  return {
-    result: `${deletedUser.username} has been deleted from the database`
-  };
+/**
+ * Delete a user from the database by ID.
+ * @param {*} userId
+ */
+const deleteUser = async (userId) => {
+  //! Deletion in regards to blocking/blocked users needs to addressed
+  try {
+    const deletedUser = await User.findByIdAndDelete(userId);
+
+    if (deletedUser) {
+      return {
+        result: `${deletedUser.username} has been deleted from the database`,
+      };
+    } else {
+      const error = new Error("No User Found");
+      throw error;
+    }
+  } catch (e) {
+    throw e;
+  }
 };
 
-const getUsernameFromId = async userId => {
-  return await User.findById(userId)
-    .select("username")
-    .lean();
+/**
+ * Return a username by the userId that matches it.
+ * @param {*} userId
+ */
+const getUsernameFromId = async (userId) => {
+  return await User.findById(userId).select("username").lean();
 };
 module.exports = {
   createUser,
@@ -191,5 +284,5 @@ module.exports = {
   activateUser,
   getUsers,
   deleteUser,
-  getUsernameFromId
+  getUsernameFromId,
 };

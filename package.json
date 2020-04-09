@@ -5,6 +5,8 @@
   "license": "MIT",
   "dependencies": {
     "bcrypt": "^3.0.7",
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
     "cookie": "^0.4.0",
     "cookie-parser": "^1.4.4",
     "cors": "^2.8.5",
@@ -20,11 +22,14 @@
     "socketio-jwt": "^4.5.0"
   },
   "devDependencies": {
+    "faker": "^4.1.0",
+    "mocha": "^7.1.1",
     "nodemon": "^2.0.2"
   },
   "scripts": {
     "start": "DEBUG=engine,socket.io* NODE_ENV=production node ./src/server.js",
     "start:dev": "NODE_ENV=development nodemon ./src/server.js",
-    "start:debug": "NODE_ENV=development nodemon --inspect ./src/server.js"
+    "start:debug": "NODE_ENV=development nodemon --inspect ./src/server.js",
+    "test": "mocha"
   }
 }

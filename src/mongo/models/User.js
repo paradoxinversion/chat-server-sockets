@@ -15,16 +15,19 @@ const Schema = mongoose.Schema;
  */
 const UserSchema = new Schema({
   username: String,
-  password: String,
+  password: {
+    type: String,
+    set: (ptPassword) => bcrypt.hashSync(ptPassword, 10),
+  },
   role: String,
   blockedUsers: [{ type: Schema.Types.ObjectId, ref: "User" }],
   blockedBy: [{ type: Schema.Types.ObjectId, ref: "User" }],
   accountStatus: String,
   profilePhotoURL: String,
-  activated: { type: Boolean, default: false }
+  activated: { type: Boolean, default: false },
 });
 
-UserSchema.methods.checkPassword = async function(password) {
+UserSchema.methods.checkPassword = async function (password) {
   return bcrypt.compare(password, this.password);
 };
 
