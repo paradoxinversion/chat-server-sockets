@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../mongo/models/User");
+const jdenticon = require("jdenticon");
 
 /**
  * Handles preconnection/authorization of incoming socket connections.
@@ -36,6 +37,28 @@ const authorizeSocket = async (socket, next) => {
   }
 };
 
+/**
+ *
+ * @param {*} clientId - socket client id
+ * @param {*} user
+ */
+const createUser = (clientId, user) => {
+  return {
+    username: user.username,
+    avatar: jdenticon.toPng(user.username, 150),
+    id: clientId,
+    socketId: clientId,
+    iid: user.iid,
+    userId: user.userId,
+    blockList: user.blockList.map((user) => user._id.toString()),
+    blockedBy: user.blockedBy.map((user) => user._id.toString()),
+    role: user.role,
+    accountStatus: user.accountStatus,
+    profilePhotoURL: user.profilePhotoURL,
+  };
+};
+
 module.exports = {
   authorizeSocket,
+  createUser,
 };
