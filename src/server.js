@@ -14,147 +14,156 @@ const socketEvents = require("./sockets/socketEvents");
 const userApi = require("./rest/v1");
 const ChatManager = require("./chatManager");
 const User = require("./mongo/models/User");
-io.origins("*:*");
 
-// CORS is set in nginx in production
-if (environment !== "production") {
-  const cors = require("cors");
-  app.use(cors({ origin: "http://localhost:3000", credentials: true }));
-}
+const runServer = async () => {
+  io.origins("*:*");
 
-setupdb(false);
+  // CORS is set in nginx in production
+  if (environment !== "production") {
+    const cors = require("cors");
+    app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+  }
+  console.log(process.env.NODE_ENV);
+  setupdb(environment !== "test" ? true : false);
 
-app.use(cookieParser());
-app.use(require("express").json());
+  app.use(cookieParser());
+  app.use(require("express").json());
 
-const chatManager = new ChatManager();
+  const chatManager = new ChatManager(io);
 
-io.use(socketActions.authorizeSocket);
+  io.use(socketActions.authorizeSocket);
 
-io.on("connection", function (socket) {
-  chatManager.addChatClient(socket.client, socket.user);
+  io.on("connection", function (socket) {
+    console.log("connection!");
+    chatManager.addChatClient(socket.client, socket.user);
 
-  socket.emit("user-connected", {
-    user: socket.client.user,
-    chatHistory: chatManager.chatHistory.map((entry) => {
-      const chatEntry = { ...entry };
-      if (chatEntry.id !== "system")
-        entry.user.avatar = jdenticon.toPng(entry.user.username, 150);
-      return chatEntry;
-    }),
+    socket.emit("user-connected", {
+      user: socket.client.user,
+      chatHistory: chatManager.chatHistory.map((entry) => {
+        const chatEntry = { ...entry };
+        if (chatEntry.id !== "system")
+          entry.user.avatar = jdenticon.toPng(entry.user.username, 150);
+        return chatEntry;
+      }),
+    });
+
+    socket.emit("chat-message-broadcast", {
+      id: "system",
+      time: Date.now(),
+      message: "Welcome to the chatroom!",
+    });
+
+    io.emit("room-user-change", {
+      users: chatManager.getChatUsers(),
+      message: `${socket.client.user.username} has entered the chat room.`,
+      user: socket.client.user,
+    });
+
+    socket.on("chat-message-sent", (data) => {
+      socketEvents.sendChatMessage(io, socket, data, chatManager.chatHistory);
+    });
+    socket.on("get-banned-users", () => {
+      socketEvents.getBannedUsers(socket);
+    });
+
+    socket.on("ban-user", (userSocketId) => {
+      socketEvents.banUser(io, userSocketId, chatManager.getClientBySocketId);
+    });
+
+    socket.on("change-user-account-status", async function ({
+      userId,
+      status,
+    }) {
+      socketEvents.changeAccountStatus(io, userId, status);
+    });
+
+    socket.on("block-user", async function ({ userId }) {
+      socketEvents.blockUser(io, socket, userId, chatManager.getClientByUserId);
+    });
+
+    socket.on("unblock-user", async function (userId) {
+      socketEvents.unblockUser(
+        io,
+        socket,
+        userId,
+        chatManager.getClientByUserId
+      );
+    });
+
+    socket.on("private-chat-initiated", function (userId) {
+      socketEvents.initatePrivateChat(io, socket, userId);
+    });
+
+    socket.on("set-username", async function ({ username, user }) {
+      socketEvents.setUsername(
+        io,
+        sockets,
+        username,
+        user,
+        chatManager.getChatUsers
+      );
+    });
+
+    socket.on("set-user-photo", async function ({ userId, photoURL }) {
+      socketEvents.setUserPhoto(io, socket, userId, photoURL);
+    });
+
+    socket.on("disconnect", function () {
+      socketEvents.disconnect(
+        io,
+        socket,
+        chatManager.removeChatClient,
+        chatManager.getChatUsers
+      );
+    });
   });
 
-  socket.emit("chat-message-broadcast", {
-    id: "system",
-    time: Date.now(),
-    message: "Welcome to the chatroom!",
+  app.post(`/chattr/sign-in`, async (req, res) => {
+    userApi.signIn(req, res);
   });
 
-  io.emit("room-user-change", {
-    users: chatManager.getChatUsers(),
-    message: `${socket.client.user.username} has entered the chat room.`,
-    user: socket.client.user,
+  app.post(`/chattr/sign-up`, async (req, res) => {
+    userApi.signUp(req, res);
   });
 
-  socket.on("chat-message-sent", (data) => {
-    socketEvents.sendChatMessage(io, socket, data, chatManager.chatHistory);
-  });
-  socket.on("get-banned-users", () => {
-    socketEvents.getBannedUsers(socket);
+  app.get(`/chattr/check-auth`, async (req, res) => {
+    userApi.checkAuthorization(req, res);
   });
 
-  socket.on("ban-user", (userSocketId) => {
-    socketEvents.banUser(io, userSocketId, chatManager.getClientBySocketId);
+  app.get("/chattr/banned-users", async (req, res) => {
+    userApi.getBannedUsers(req, res);
   });
 
-  socket.on("change-user-account-status", async function ({ userId, status }) {
-    socketEvents.changeAccountStatus(io, userId, status);
+  app.get("/chattr/users", async (req, res) => {
+    userApi.getUsers(req, res);
   });
 
-  socket.on("block-user", async function ({ userId }) {
-    socketEvents.blockUser(io, socket, userId, chatManager.getClientByUserId);
+  app.get("/chattr/blocked-users", async (req, res) => {
+    userApi.getBlockedUsers(req, res);
   });
 
-  socket.on("unblock-user", async function (userId) {
-    socketEvents.unblockUser(io, socket, userId, chatManager.getClientByUserId);
+  app.delete("/chattr/user", async (req, res) => {
+    userApi.deleteUser(req, res);
   });
 
-  socket.on("private-chat-initiated", function (userId) {
-    socketEvents.initatePrivateChat(io, socket, userId);
+  app.get(`/chattr/logout`, async (req, res) => {
+    userApi.logOut(req, res);
   });
 
-  socket.on("set-username", async function ({ username, user }) {
-    socketEvents.setUsername(
-      io,
-      sockets,
-      username,
-      user,
-      chatManager.getChatUsers
-    );
+  app.post(`/chattr/update-password`, async (req, res) => {
+    userApi.updatePassword(req, res);
   });
 
-  socket.on("set-user-photo", async function ({ userId, photoURL }) {
-    socketEvents.setUserPhoto(io, socket, userId, photoURL);
+  app.post(`/chattr/set-photo`, async (req, res) => {
+    userApi.setPhoto(req, res);
+  });
+  app.post(`/chattr/pending-users`, async (req, res) => {
+    userApi.getPendingUsers(req, res);
+  });
+  app.post(`/chattr/confirm-user`, async (req, res) => {
+    userApi.confirmUser(req, res);
   });
 
-  socket.on("disconnect", function () {
-    socketEvents.disconnect(
-      io,
-      socket,
-      chatManager.removeChatClient,
-      chatManager.getChatUsers
-    );
-  });
-});
-
-app.post(`/chattr/sign-in`, async (req, res) => {
-  userApi.signIn(req, res);
-});
-
-app.post(`/chattr/sign-up`, async (req, res) => {
-  userApi.signUp(req, res);
-});
-
-app.get(`/chattr/check-auth`, async (req, res) => {
-  userApi.checkAuthorization(req, res);
-});
-
-app.get("/chattr/banned-users", async (req, res) => {
-  userApi.getBannedUsers(req, res);
-});
-
-app.get("/chattr/users", async (req, res) => {
-  userApi.getUsers(req, res);
-});
-
-app.get("/chattr/blocked-users", async (req, res) => {
-  userApi.getBlockedUsers(req, res);
-});
-
-app.delete("/chattr/user", async (req, res) => {
-  userApi.deleteUser(req, res);
-});
-
-app.get(`/chattr/logout`, async (req, res) => {
-  userApi.logOut(req, res);
-});
-
-app.post(`/chattr/update-password`, async (req, res) => {
-  userApi.updatePassword(req, res);
-});
-
-app.post(`/chattr/set-photo`, async (req, res) => {
-  userApi.setPhoto(req, res);
-});
-app.post(`/chattr/pending-users`, async (req, res) => {
-  userApi.getPendingUsers(req, res);
-});
-app.post(`/chattr/confirm-user`, async (req, res) => {
-  userApi.confirmUser(req, res);
-});
-
-http.listen(config.server.port, async function () {
-  console.log(`Listening on port ${config.server.port}`);
   const admin = await User.findOne({ role: 2 });
   if (!admin) {
     console.log(
@@ -168,4 +177,13 @@ http.listen(config.server.port, async function () {
     adminUser.activated = true;
     await adminUser.save();
   }
-});
+  http.listen(config.server.port, async function () {
+    console.log(`Listening on port ${config.server.port}`);
+  });
+
+  return {
+    chatManager,
+  };
+};
+// runServer();
+module.exports = runServer;

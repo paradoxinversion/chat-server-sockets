@@ -30,6 +30,6 @@
     "start": "DEBUG=engine,socket.io* NODE_ENV=production node ./src/server.js",
     "start:dev": "NODE_ENV=development nodemon ./src/server.js",
     "start:debug": "NODE_ENV=development nodemon --inspect ./src/server.js",
-    "test": "mocha"
+    "test": "mocha --reporter spec --exit"
   }
 }

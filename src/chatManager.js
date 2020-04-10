@@ -1,8 +1,9 @@
 const socketActions = require("./sockets/socketActions");
 
-const ChatManager = function () {
+const ChatManager = function (io) {
   this.chatClients = [];
   this.chatHistory = [];
+  this.io = io;
 
   /**
    * Adds a chat client to the `chatClients` array if one doesn't
@@ -10,6 +11,7 @@ const ChatManager = function () {
    * @param {*} client - A socket client
    */
   this.addChatClient = (client, user) => {
+    console.log("Added chat client");
     let clientExists = false;
     for (let x = 0; x < this.chatClients.length; x++) {
       const chatClient = this.chatClients[x];

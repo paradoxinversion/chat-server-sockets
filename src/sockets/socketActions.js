@@ -15,6 +15,7 @@ const authorizeSocket = async (socket, next) => {
     if (!userToken) next(new Error("No token provided"));
 
     const userData = jwt.verify(userToken, process.env.JWT_SECRET_KEY);
+
     if (!userData) next(new Error("Invalid user token"));
 
     const dbUser = await User.findById(userData.user);
