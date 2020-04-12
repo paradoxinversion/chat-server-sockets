@@ -11,7 +11,6 @@ const ChatManager = function (io) {
    * @param {*} client - A socket client
    */
   this.addChatClient = (client, user) => {
-    console.log("Added chat client");
     let clientExists = false;
     for (let x = 0; x < this.chatClients.length; x++) {
       const chatClient = this.chatClients[x];

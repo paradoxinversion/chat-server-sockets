@@ -130,10 +130,16 @@ const unblockUser = async function (io, socket, userId, getClientByUserId) {
   }
 };
 
+/**
+ * Initiates a private chat between two users, by setting up a named
+ * room cosisting of both user's socketids, joined with a dash (-)
+ * @param {*} io
+ * @param {*} socket
+ * @param {*} userId
+ */
 const initatePrivateChat = function (io, socket, userId) {
   const [p1, p2] = [socket.id, userId].sort((a, b) => a - b);
   const roomName = `${p1}-${p2}`;
-
   Promise.all([
     socket.join(roomName),
     io.sockets.sockets[userId].join(roomName),
@@ -177,6 +183,7 @@ const setUserPhoto = async function (
 };
 
 const disconnect = function (io, socket, removeChatClient, getChatUsers) {
+  console.log("Socket disconnected");
   removeChatClient(socket.id);
   io.emit("user-disconnected", { username: socket.client.user });
   io.emit("room-user-change", {

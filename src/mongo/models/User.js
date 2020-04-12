@@ -19,10 +19,10 @@ const UserSchema = new Schema({
     type: String,
     set: (ptPassword) => bcrypt.hashSync(ptPassword, 10),
   },
-  role: String,
+  role: { type: String, default: "0" },
   blockedUsers: [{ type: Schema.Types.ObjectId, ref: "User" }],
   blockedBy: [{ type: Schema.Types.ObjectId, ref: "User" }],
-  accountStatus: String,
+  accountStatus: { type: String, default: "0" },
   profilePhotoURL: String,
   activated: { type: Boolean, default: false },
 });

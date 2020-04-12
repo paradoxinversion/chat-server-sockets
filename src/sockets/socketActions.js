@@ -19,6 +19,7 @@ const authorizeSocket = async (socket, next) => {
     if (!userData) next(new Error("Invalid user token"));
 
     const dbUser = await User.findById(userData.user);
+
     if (dbUser.accountStatus == "2") return next(new Error("You are banned."));
     socket.user = {
       username: dbUser.username,

@@ -23,7 +23,6 @@ const runServer = async () => {
     const cors = require("cors");
     app.use(cors({ origin: "http://localhost:3000", credentials: true }));
   }
-  console.log(process.env.NODE_ENV);
   setupdb(environment !== "test" ? true : false);
 
   app.use(cookieParser());
@@ -34,7 +33,6 @@ const runServer = async () => {
   io.use(socketActions.authorizeSocket);
 
   io.on("connection", function (socket) {
-    console.log("connection!");
     chatManager.addChatClient(socket.client, socket.user);
 
     socket.emit("user-connected", {
@@ -78,7 +76,12 @@ const runServer = async () => {
     });
 
     socket.on("block-user", async function ({ userId }) {
-      socketEvents.blockUser(io, socket, userId, chatManager.getClientByUserId);
+      await socketEvents.blockUser(
+        io,
+        socket,
+        userId,
+        chatManager.getClientByUserId
+      );
     });
 
     socket.on("unblock-user", async function (userId) {
@@ -170,8 +173,8 @@ const runServer = async () => {
       "No Administrator-- Creating default admin. Change the password as soon as possible"
     );
     const adminUser = await userActions.createUser({
-      username: process.env.DEFAULT_ADMIN_USERNAME,
-      password: process.env.DEFAULT_ADMIN_PASSWORD,
+      username: "test",
+      password: "test",
     });
     adminUser.role = 2;
     adminUser.activated = true;

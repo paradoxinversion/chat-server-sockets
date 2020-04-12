@@ -1,6 +1,6 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
-
+const mongoose = require("mongoose");
 /**
  * Creates a new user with the provided name and password,
  * defaulting to a basic role unless one is provided.
@@ -49,32 +49,40 @@ const createUser = async ({ username, password, role = 0 }) => {
  * and the users the blocked user has been blocked by
  */
 const addUserToBlockList = async (blockingUserId, blockedUserId) => {
+  // Return an error early if params are missing
   if (!blockedUserId || !blockedUserId) {
     const err = new Error(
       "Blocking or blocked user is missing from addUserToBlockList parameters."
     );
     throw err;
   }
+
+  // Get the initiating user object
+  const blockerResult = await User.updateOne(
+    { _id: mongoose.Types.ObjectId(blockingUserId) },
+    {
+      $push: {
+        blockedUsers: blockedUserId,
+      },
+    }
+  );
+
+  const blockeeResult = await User.updateOne(
+    { _id: mongoose.Types.ObjectId(blockedUserId) },
+    {
+      $push: {
+        blockedBy: blockingUserId,
+      },
+    }
+  );
   const blockingUser = await User.findById(blockingUserId);
-  if (!blockingUser.blockedUsers.includes(blockedUserId)) {
-    const blockedUser = await User.findById(blockedUserId);
-    blockingUser.blockedUsers.push(blockedUserId);
-    blockedUser.blockedBy.push(blockingUserId);
-    await blockingUser.save();
-    await blockedUser.save();
-
-    return {
-      blocked: blockingUser.blockedUsers,
-      blockedBy: blockedUser.blockedBy,
-    };
-  } else {
-    return {
-      blocked: blockingUser.blockedUsers,
-      blockedBy: blockedUser.blockedBy,
-    };
-  }
+  const blockedUser = await User.findById(blockedUserId);
+  // debugger;
+  return {
+    blocked: blockingUser.blockedUsers,
+    blockedBy: blockedUser.blockedBy,
+  };
 };
-
 /**
  * Remove a user from another's blocklisdt
  * @param {*} unblockingUserId
@@ -82,32 +90,31 @@ const addUserToBlockList = async (blockingUserId, blockedUserId) => {
  * @returns An object containing two arrays: the users the blocking user has blocked,
  * and the users the blocked user has been blocked by
  */
+
 const removeUserFromBlockList = async (unblockingUserId, unblockedUserId) => {
+  await User.updateOne(
+    { _id: mongoose.Types.ObjectId(unblockingUserId) },
+    {
+      $pull: {
+        blockedUsers: unblockedUserId,
+      },
+    }
+  );
+  await User.updateOne(
+    { _id: mongoose.Types.ObjectId(unblockedUserId) },
+    {
+      $pull: {
+        blockedBy: unblockingUserId,
+      },
+    }
+  );
   const unblockingUser = await User.findById(unblockingUserId);
-  if (unblockingUser.blockedUsers.includes(unblockedUserId)) {
-    const unblockedUser = await User.findById(unblockedUserId);
-    unblockingUser.blockedUsers.splice(
-      unblockingUser.blockedUsers.indexOf(unblockedUserId),
-      1
-    );
-    unblockedUser.blockedBy.splice(
-      unblockedUser.blockedBy.indexOf(unblockingUserId),
-      1
-    );
-    await unblockingUser.save();
-    await unblockedUser.save();
-    return {
-      result: 1,
-      blocked: unblockingUser.blockedUsers,
-      blockedBy: unblockedUser.blockedBy,
-    };
-  } else {
-    return {
-      result: 0,
-      blocked: unblockingUser.blockedUsers,
-      blockedBy: unblockedUser.blockedBy,
-    };
-  }
+  const unblockedUser = await User.findById(unblockedUserId);
+  return {
+    result: 1,
+    blocked: unblockingUser.blockedUsers,
+    blockedBy: unblockedUser.blockedBy,
+  };
 };
 
 /**
