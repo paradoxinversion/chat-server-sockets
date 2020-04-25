@@ -77,7 +77,6 @@ const addUserToBlockList = async (blockingUserId, blockedUserId) => {
   );
   const blockingUser = await User.findById(blockingUserId);
   const blockedUser = await User.findById(blockedUserId);
-  // debugger;
   return {
     blocked: blockingUser.blockedUsers,
     blockedBy: blockedUser.blockedBy,
@@ -92,29 +91,34 @@ const addUserToBlockList = async (blockingUserId, blockedUserId) => {
  */
 
 const removeUserFromBlockList = async (unblockingUserId, unblockedUserId) => {
-  await User.updateOne(
-    { _id: mongoose.Types.ObjectId(unblockingUserId) },
-    {
-      $pull: {
-        blockedUsers: unblockedUserId,
-      },
-    }
-  );
-  await User.updateOne(
-    { _id: mongoose.Types.ObjectId(unblockedUserId) },
-    {
-      $pull: {
-        blockedBy: unblockingUserId,
-      },
-    }
-  );
-  const unblockingUser = await User.findById(unblockingUserId);
-  const unblockedUser = await User.findById(unblockedUserId);
-  return {
-    result: 1,
-    blocked: unblockingUser.blockedUsers,
-    blockedBy: unblockedUser.blockedBy,
-  };
+  try {
+    await User.updateOne(
+      { _id: mongoose.Types.ObjectId(unblockingUserId) },
+      {
+        $pull: {
+          blockedUsers: unblockedUserId,
+        },
+      }
+    );
+    await User.updateOne(
+      { _id: mongoose.Types.ObjectId(unblockedUserId) },
+      {
+        $pull: {
+          blockedBy: unblockingUserId,
+        },
+      }
+    );
+    debugger;
+    const unblockingUser = await User.findById(unblockingUserId);
+    const unblockedUser = await User.findById(unblockedUserId);
+    return {
+      result: 1,
+      blocked: unblockingUser.blockedUsers,
+      blockedBy: unblockedUser.blockedBy,
+    };
+  } catch (e) {
+    throw e;
+  }
 };
 
 /**

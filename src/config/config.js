@@ -20,7 +20,7 @@ module.exports = (() => {
       require("dotenv").config();
     } else if (getEnv() === "production") {
       require("dotenv").config({
-        path: path.resolve(process.cwd(), ".env.production")
+        path: path.resolve(process.cwd(), ".env.production"),
       });
     }
 
@@ -29,8 +29,12 @@ module.exports = (() => {
         port: process.env.SERVER_PORT,
         cookieName: process.env.COOKIE_NAME,
         allowedOrigins: process.env.ALLOWED_ORIGINS,
-        socketPath: process.env.SOCKETIO_PATH
-      }
+        socketPath: process.env.SOCKETIO_PATH,
+      },
+      admin: {
+        username: process.env.DEFAULT_ADMIN_USERNAME,
+        password: process.env.DEFAULT_ADMIN_PASSWORD,
+      },
     };
     return config;
   };
@@ -42,6 +46,6 @@ module.exports = (() => {
   makeConfig();
   return {
     getEnv,
-    getConfig
+    getConfig,
   };
 })();

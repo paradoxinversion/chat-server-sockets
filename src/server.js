@@ -23,7 +23,7 @@ const runServer = async () => {
     const cors = require("cors");
     app.use(cors({ origin: "http://localhost:3000", credentials: true }));
   }
-  setupdb(environment !== "test" ? true : false);
+  setupdb(environment === "test" ? true : false);
 
   app.use(cookieParser());
   app.use(require("express").json());
@@ -160,26 +160,26 @@ const runServer = async () => {
   app.post(`/chattr/set-photo`, async (req, res) => {
     userApi.setPhoto(req, res);
   });
-  app.post(`/chattr/pending-users`, async (req, res) => {
+  app.get(`/chattr/pending-users`, async (req, res) => {
     userApi.getPendingUsers(req, res);
   });
   app.post(`/chattr/confirm-user`, async (req, res) => {
     userApi.confirmUser(req, res);
   });
-
   const admin = await User.findOne({ role: 2 });
   if (!admin) {
     console.log(
       "No Administrator-- Creating default admin. Change the password as soon as possible"
     );
     const adminUser = await userActions.createUser({
-      username: "test",
-      password: "test",
+      username: config.admin.username,
+      password: config.admin.password,
     });
     adminUser.role = 2;
     adminUser.activated = true;
     await adminUser.save();
   }
+
   http.listen(config.server.port, async function () {
     console.log(`Listening on port ${config.server.port}`);
   });
@@ -188,5 +188,5 @@ const runServer = async () => {
     chatManager,
   };
 };
-// runServer();
+environment !== "test" && runServer();
 module.exports = runServer;

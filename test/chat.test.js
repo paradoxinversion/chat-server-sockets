@@ -227,7 +227,7 @@ describe("chat", function () {
       user2.blockedBy = [];
       user2.blockedBy.push(user1.id);
       await user2.save();
-      debugger;
+
       client1.emit("unblock-user", user2.id);
       client2.on("unblock-user", function (data) {
         console.log("p????");

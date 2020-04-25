@@ -117,16 +117,20 @@ const blockUser = async function (io, socket, userId, getClientByUserId) {
 };
 
 const unblockUser = async function (io, socket, userId, getClientByUserId) {
-  const unblockResult = await userActions.removeUserFromBlockList(
-    socket.client.user.iid,
-    userId
-  );
-
-  socket.emit("unblock-user", { blocklist: unblockResult.blocked });
-  if (getClientByUserId(userId)) {
-    io.sockets.sockets[getClientByUserId(userId).id].emit("unblock-user", {
-      blockedBy: unblockResult.blockedBy,
-    });
+  try {
+    const unblockResult = await userActions.removeUserFromBlockList(
+      socket.client.user.userId,
+      userId
+    );
+    // debugger;
+    socket.emit("unblock-user", { blocklist: unblockResult.blocked });
+    if (getClientByUserId(userId)) {
+      io.sockets.sockets[getClientByUserId(userId).id].emit("unblock-user", {
+        blockedBy: unblockResult.blockedBy,
+      });
+    }
+  } catch (e) {
+    throw e;
   }
 };
 
